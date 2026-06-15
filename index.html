@@ -42,7 +42,7 @@
     max-width:480px;margin:0 auto;
     overflow:hidden;
     display:flex;flex-direction:column;
-    padding:calc(var(--safe-t) + 6px) 12px calc(var(--safe-b) + 4px);
+    padding:calc(var(--safe-t) + 6px) 12px 0;
   }
 
   /* ---- Top bar: mode switch ---- */
@@ -132,6 +132,7 @@
     flex:0 0 auto;
     display:grid;gap:7px;
     grid-template-columns:repeat(4,1fr);
+    padding-bottom:calc(var(--safe-b) + 4px);
   }
   .pad button{
     border:0;border-radius:16px;cursor:pointer;
