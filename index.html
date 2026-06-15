@@ -102,6 +102,9 @@
     display:flex;align-items:center;justify-content:center;
   }
   .undo:active{background:var(--key-press);}
+  .row.sum-divider{background:var(--amber-soft);border:1px solid rgba(232,148,58,.22);}
+  .row.sum-divider .sum-eq{color:var(--amber);font-size:20px;font-weight:700;width:30px;text-align:center;flex:0 0 auto;}
+  .row.sum-divider .val{color:var(--amber);}
 
   /* ---- Live display ---- */
   .display{
@@ -301,24 +304,30 @@
     var r=Math.round(v*1e6)/1e6;
     return (""+r).replace(".",",");
   }
-  function evaluate(){
-    // Erstes Element + alle Schritte mit korrekter Punkt-vor-Strich-Behandlung.
-    // Schritte enthalten bereits den committeten Wert. + - * / werden links->rechts
-    // ausgewertet ABER * und / binden stärker. Wir bauen Term-Liste.
-    if(steps.length===0) return 0;
-    var nums=[steps[0].value], ops=[];
-    for(var i=1;i<steps.length;i++){ ops.push(steps[i].op); nums.push(steps[i].value); }
-    // erst * und /
-    for(var j=0;j<ops.length;){
+  function applyMulDiv(nums, ops){
+    var j=0;
+    while(j<ops.length){
       if(ops[j]==="*"||ops[j]==="/"){
         var a=nums[j], b=nums[j+1];
-        var r = ops[j]==="*" ? a*b : (b===0?NaN:a/b);
+        var div=b===0?Number.NaN:a/b;
+        var r=ops[j]==="*"?a*b:div;
         nums.splice(j,2,r); ops.splice(j,1);
       } else j++;
     }
+  }
+  function evaluate(){
+    var startIdx=0, lastSumValue=0;
+    for(var si=steps.length-1;si>=0;si--){
+      if(steps[si].type==="sum"){ startIdx=si+1; lastSumValue=steps[si].value; break; }
+    }
+    var rel=steps.slice(startIdx);
+    if(rel.length===0) return lastSumValue;
+    var nums=[rel[0].value], ops=[];
+    for(var ri=1;ri<rel.length;ri++){ ops.push(rel[ri].op); nums.push(rel[ri].value); }
+    applyMulDiv(nums, ops);
     var acc=nums[0];
     for(var k=0;k<ops.length;k++){
-      acc = ops[k]==="+" ? acc+nums[k+1] : acc-nums[k+1];
+      acc=ops[k]==="+"?acc+nums[k+1]:acc-nums[k+1];
     }
     return acc;
   }
@@ -338,12 +347,24 @@
         : "Zahl eingeben und mit + − × ÷ verketten.";
       el.tape.appendChild(e);
     } else {
-      steps.forEach(function(st,i){
-        var row=document.createElement("div"); row.className="row";
-        var idx=document.createElement("div"); idx.className="idx"; idx.textContent=(i+1);
-        var op=document.createElement("div"); op.className="op"; op.textContent = i===0? "" : opSymbol(st.op);
+      var stepNum=0, firstInGroup=true;
+      steps.forEach(function(st){
+        var row=document.createElement("div");
         var val=document.createElement("div"); val.className="val"; val.textContent=valueLabel(st.value);
-        row.appendChild(idx); row.appendChild(op); row.appendChild(val);
+        if(st.type==="sum"){
+          row.className="row sum-divider";
+          var eq=document.createElement("div"); eq.className="sum-eq"; eq.textContent="=";
+          var sp=document.createElement("div"); sp.style.flex="1";
+          row.appendChild(eq); row.appendChild(sp); row.appendChild(val);
+          firstInGroup=true;
+        } else {
+          stepNum++;
+          row.className="row";
+          var idx=document.createElement("div"); idx.className="idx"; idx.textContent=stepNum;
+          var op=document.createElement("div"); op.className="op"; op.textContent=firstInGroup?"":opSymbol(st.op);
+          row.appendChild(idx); row.appendChild(op); row.appendChild(val);
+          firstInGroup=false;
+        }
         el.tape.appendChild(row);
       });
       el.tape.scrollTop = el.tape.scrollHeight;
