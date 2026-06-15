@@ -225,12 +225,11 @@
   var steps = [];               // {op:'+'|'-'|'*'|'/'|null, value:Number} | {type:'sum', value:Number}
   var lastEntryWasResult = false;
   var pendingOp = null;         // Operator, der auf den nächsten committeten Wert wartet
-  var timeWithSecs = false;     // false = H:MM-Modus, true = H:MM:SS-Modus (umschalten mit ":")
   var ready = false;
 
   // Getrennter Zustand je Modus.
   var saved = {
-    time: { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null, timeWithSecs:false },
+    time: { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null },
     num:  { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null }
   };
 
@@ -239,8 +238,7 @@
       entry: entry,
       steps: steps.slice(),
       lastEntryWasResult: lastEntryWasResult,
-      pendingOp: pendingOp,
-      timeWithSecs: timeWithSecs
+      pendingOp: pendingOp
     };
   }
   function restoreState(m){
@@ -249,10 +247,9 @@
     steps = s.steps.slice();
     lastEntryWasResult = s.lastEntryWasResult;
     pendingOp = s.pendingOp;
-    timeWithSecs = (m==="time") ? (s.timeWithSecs || false) : false;
   }
 
-  var STORE_KEY = "zeitrechner-state-v3";
+  var STORE_KEY = "zeitrechner-state-v4";
   function persist(){
     captureState();
     try{
@@ -285,40 +282,53 @@
   function haptic(){ if(navigator.vibrate) try{navigator.vibrate(8);}catch(e){} }
 
   /* ---------- Zeit-Helfer ----------
-     Zwei Modi:
-     timeWithSecs=false (Standard): Ziffern als H...H:MM — letzte 2 = Minuten, Rest = Stunden
-     timeWithSecs=true:             Ziffern als H...H:MM:SS — letzte 2 = Sek, nächste 2 = Min, Rest = Std
-     Unterstützt bis zu 100.000 Stunden.
+     Ohne ":" im entry: Auto-Modus — letzte 2 Ziffern = Minuten, Rest = Stunden (H:MM).
+     Mit ":" im entry: Explizit-Modus — Felder werden links nach rechts eingegeben.
+       Einzelne Ziffer in Min/Sek = Zehnerstelle (1 → 10, nicht 01).
+       Leerfeld = 0. Bis zu 2 Doppelpunkte erlaubt (H:MM:SS).
+     Beispiele: "145"→1:45, "1:45"→1:45, "1:1"→1:10, "1::15"→1:00:15
   */
   function pad2(n){ return (n<10?"0":"")+n; }
 
-  function digitsToSeconds(d){
-    d = d.replace(/\D/g,"");
-    if(!d) return 0;
-    var s, m, h;
-    if(timeWithSecs){
-      s = Number.parseInt(d.slice(-2)||"0",10);
-      m = Number.parseInt(d.slice(-4,-2)||"0",10);
-      h = Number.parseInt(d.slice(0,-4)||"0",10);
-      return h*3600 + m*60 + s;
+  function entryToSeconds(e){
+    if(!e) return 0;
+    var h, m, mStr, s, sStr, parts;
+    if(!e.includes(":")){
+      // Auto-Modus: letzte 2 = Min, Rest = Std
+      m = Number.parseInt(e.slice(-2)||"0",10);
+      h = Number.parseInt(e.slice(0,-2)||"0",10);
+      return h*3600 + m*60;
     }
-    m = Number.parseInt(d.slice(-2)||"0",10);
-    h = Number.parseInt(d.slice(0,-2)||"0",10);
-    return h*3600 + m*60;
+    parts = e.split(":");
+    h = Number.parseInt(parts[0]||"0",10);
+    mStr = parts[1]||"";
+    m = Number.parseInt(mStr||"0",10);
+    if(mStr.length===1) m *= 10; // Zehnerstelle
+    s = 0;
+    if(parts.length>=3){
+      sStr = parts[2]||"";
+      s = Number.parseInt(sStr||"0",10);
+      if(sStr.length===1) s *= 10;
+    }
+    return h*3600 + m*60 + s;
   }
-  function fmtTimeFromDigits(d){
-    d = d.replace(/\D/g,"");
-    if(!d) return "0:00";
-    var sec, min, hr;
-    if(timeWithSecs){
-      sec = Number.parseInt(d.slice(-2)||"0",10);
-      min = Number.parseInt(d.slice(-4,-2)||"0",10);
-      hr  = Number.parseInt(d.slice(0,-4)||"0",10);
-      return hr>0 ? hr+":"+pad2(min)+":"+pad2(sec) : min+":"+pad2(sec);
+  function fmtTimeEntry(e){
+    if(!e) return "0:00";
+    var h, m, mStr, mDisp, parts, sStr, sDisp;
+    if(!e.includes(":")){
+      // Auto-Modus
+      m = Number.parseInt(e.slice(-2)||"0",10);
+      h = Number.parseInt(e.slice(0,-2)||"0",10);
+      return h+":"+pad2(m);
     }
-    min = Number.parseInt(d.slice(-2)||"0",10);
-    hr  = Number.parseInt(d.slice(0,-2)||"0",10);
-    return hr+":"+pad2(min);
+    parts = e.split(":");
+    h = parts[0]||"0";
+    mStr = parts[1]||"";
+    if(mStr.length===0) mDisp="00"; else if(mStr.length===1) mDisp=mStr+"0"; else mDisp=mStr;
+    if(parts.length===2) return h+":"+mDisp;
+    sStr = parts[2]||"";
+    if(sStr.length===0) sDisp="00"; else if(sStr.length===1) sDisp=sStr+"0"; else sDisp=sStr;
+    return h+":"+mDisp+":"+sDisp;
   }
   function fmtSeconds(total){
     var neg = total<0; total=Math.abs(Math.round(total));
@@ -342,20 +352,16 @@
 
   /* ---------- Auswertung ---------- */
   function currentValue(){
-    if(mode==="time") return digitsToSeconds(entry);
+    if(mode==="time") return entryToSeconds(entry);
     return entry==="" ? 0 : Number.parseFloat(entry.replace(",","."));
   }
   function valueToEntry(v){
     if(mode==="time"){
       var total=Math.abs(Math.round(v));
       var h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
-      var str;
-      if(timeWithSecs){
-        str = h>0 ? (""+h)+pad2(m)+pad2(s) : (""+m)+pad2(s);
-      } else {
-        str = (""+h)+pad2(m);
-      }
-      return str.replace(/^0+(?=\d)/,"");
+      // Ergebnis immer im expliziten Format H:MM oder H:MM:SS
+      if(s>0) return h+":"+pad2(m)+":"+pad2(s);
+      return h+":"+pad2(m);
     }
     if(!Number.isFinite(v)) return "";
     var r=Math.round(v*1e6)/1e6;
@@ -430,17 +436,22 @@
     // Pending-Operator / aktuelle Eingabe
     el.pending.textContent = pendingOp ? opSymbol(pendingOp) : "";
     if(mode==="time"){
-      el.current.textContent = entry==="" ? "0:00" : fmtTimeFromDigits(entry);
+      el.current.textContent = entry==="" ? "0:00" : fmtTimeEntry(entry);
+    } else if(entry===""){
+      el.current.textContent = "0";
+    } else if(entry.endsWith(",")){
+      // Komma sofort sichtbar machen
+      el.current.textContent = fmtNum(Number.parseFloat(entry.slice(0,-1).replace(",",".")||"0"))+",";
     } else {
-      el.current.textContent = entry==="" ? "0" : fmtNum(Number.parseFloat(entry.replace(",",".")));
+      el.current.textContent = fmtNum(Number.parseFloat(entry.replace(",",".")));
     }
     // armed operator highlight
     Array.prototype.forEach.call(document.querySelectorAll(".pad .op"),function(b){
       b.classList.toggle("armed", b.dataset.op===pendingOp);
     });
-    // armed colon highlight (Sekunden-Modus aktiv)
+    // Doppelpunkt leuchtet wenn expliziter Modus aktiv (entry enthält ":")
     var colonBtn = el.pad.querySelector(".colon");
-    if(colonBtn && mode==="time") colonBtn.classList.toggle("armed", timeWithSecs);
+    if(colonBtn && mode==="time") colonBtn.classList.toggle("armed", entry.includes(":"));
     if(ready) persist();
   }
 
@@ -460,13 +471,15 @@
   function pressDigit(d){
     if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
     if(mode==="time"){
-      // H:MM: max 9 Ziffern (7 Std + 2 Min), H:MM:SS: max 11 Ziffern
-      var maxLen = timeWithSecs ? 11 : 9;
-      if(entry.length >= maxLen) return;
+      var parts = entry.split(":");
+      var colons = parts.length-1;
+      // Im aktuellen Min-/Sek-Feld max 2 Ziffern; im Auto-Modus max 9 Gesamt
+      if(colons>=1 && parts[colons].length>=2) return;
+      if(colons===0 && entry.length>=9) return;
       entry += d;
     } else {
       if(d==="." || d===","){
-        if(entry.indexOf(",")>=0) return;
+        if(entry.includes(",")) return;
         if(entry==="") entry="0";
         entry += ",";
       } else {
@@ -509,10 +522,10 @@
   }
 
   function pressColonTime(){
-    // Wechselt zwischen H:MM und H:MM:SS; konvertiert den aktuellen Eingabewert.
-    var v = digitsToSeconds(entry);
-    timeWithSecs = !timeWithSecs;
-    if(entry !== "") entry = valueToEntry(v);
+    if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
+    var colons = (entry.match(/:/g)||[]).length;
+    if(colons>=2) return; // max. 2 Doppelpunkte (H:MM:SS)
+    entry += ":";
     render();
   }
 
@@ -522,7 +535,6 @@
   }
   function clearAll(){
     entry=""; steps=[]; pendingOp=null; lastEntryWasResult=false;
-    timeWithSecs=false;
     render();
   }
   function clearEntry(){
