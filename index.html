@@ -38,6 +38,7 @@
     user-select:none;-webkit-user-select:none;
     overscroll-behavior:none;
   }
+  button{touch-action:manipulation;}
   .app{
     width:100%;max-width:480px;height:100dvh;overflow:hidden;
     display:flex;flex-direction:column;
@@ -49,8 +50,9 @@
     display:flex;gap:6px;padding:5px;
     background:var(--panel);border-radius:16px;
     margin-bottom:8px;flex:0 0 auto;
+    align-items:center;
   }
-  .modebar button{
+  .modebar .modetab{
     flex:1;border:0;background:transparent;color:var(--muted);
     font-size:14px;font-weight:600;letter-spacing:.3px;
     padding:9px 0;border-radius:12px;cursor:pointer;
@@ -58,7 +60,15 @@
     font-family:inherit;
     display:flex;align-items:center;justify-content:center;gap:6px;
   }
-  .modebar button.active{background:var(--key);color:var(--txt);}
+  .modebar .modetab.active{background:var(--key);color:var(--txt);}
+  .info-btn{
+    width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
+    background:#2b2b31;color:var(--muted);
+    font-size:15px;font-style:italic;font-family:Georgia,serif;
+    display:flex;align-items:center;justify-content:center;
+    flex:0 0 auto;margin-left:2px;
+  }
+  .info-btn:active{background:var(--key-press);}
 
   /* ---- Tape (Verlauf) ---- */
   .tape-wrap{
@@ -110,11 +120,11 @@
   /* ---- Live display ---- */
   .display{
     flex:0 0 auto;text-align:right;
-    padding:2px 12px 8px;
+    padding:0 12px 4px;
     font-variant-numeric:tabular-nums;
-    min-height:68px;display:flex;flex-direction:column;justify-content:flex-end;
+    display:flex;flex-direction:column;justify-content:flex-end;
   }
-  .display .pending{color:var(--muted);font-size:16px;height:20px;font-weight:500;letter-spacing:.5px;}
+  .display .pending{color:var(--muted);font-size:16px;line-height:20px;font-weight:500;letter-spacing:.5px;}
   .display .current{color:var(--amber);font-size:clamp(40px,11vw,58px);font-weight:600;line-height:1;letter-spacing:1px;}
 
   /* ---- Keypad ---- */
@@ -141,16 +151,38 @@
   .pad .eq{background:#4f9d61;color:#0c1a0f;font-weight:700;}
   .pad .wide{grid-column:span 2;}
   .pad .colon{font-size:clamp(22px,5.6vw,26px);}
-  .pad .sep-hint{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.5px;}
-  .version-hint{align-self:center;font-size:10px;font-weight:500;color:var(--muted);opacity:.28;margin-left:auto;padding-right:4px;font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+  .pad .colon.armed{background:var(--amber-soft);color:var(--amber);}
+
+  /* ---- About overlay ---- */
+  .about-overlay{
+    position:fixed;inset:0;
+    background:rgba(0,0,0,.72);
+    display:flex;align-items:center;justify-content:center;
+    z-index:100;
+  }
+  .about-dialog{
+    background:var(--panel);border-radius:var(--radius);
+    padding:28px 24px 24px;text-align:center;max-width:280px;width:90%;
+    display:flex;flex-direction:column;align-items:center;gap:10px;
+  }
+  .about-icon{width:80px;height:80px;border-radius:20px;}
+  .about-title{margin:0;font-size:22px;font-weight:700;color:var(--txt);}
+  .about-sub{margin:0;font-size:13px;color:var(--muted);line-height:1.5;}
+  .about-version{margin:0;font-size:12px;color:var(--muted);opacity:.6;font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+  .about-close{
+    margin-top:8px;border:0;border-radius:12px;cursor:pointer;
+    background:var(--key);color:var(--txt);font-family:inherit;
+    font-size:15px;font-weight:600;padding:10px 28px;
+  }
+  .about-close:active{background:var(--key-press);}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="modebar" id="modebar">
-    <button data-mode="time" class="active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Zeit</button>
-    <button data-mode="num"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>Rechner</button>
-    <span class="version-hint" id="versionHint">__COMMIT__</span>
+    <button data-mode="time" class="modetab active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Zeit</button>
+    <button data-mode="num" class="modetab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>Rechner</button>
+    <button class="info-btn" id="infoBtn" aria-label="Über die App">i</button>
   </div>
 
   <div class="tape-wrap">
@@ -172,6 +204,16 @@
   <div class="pad" id="pad"></div>
 </div>
 
+<div id="aboutOverlay" class="about-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Über die App">
+  <div class="about-dialog">
+    <img class="about-icon" src="icon-192.png" alt="" />
+    <h2 class="about-title">Zeitrechner</h2>
+    <p class="about-sub">Rechnen mit Zeiten und Zahlen.</p>
+    <p class="about-version">__COMMIT__</p>
+    <button class="about-close" id="aboutClose">Schließen</button>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -182,13 +224,12 @@
   var steps = [];               // {op:'+'|'-'|'*'|'/'|null, value:Number} | {type:'sum', value:Number}
   var lastEntryWasResult = false;
   var pendingOp = null;         // Operator, der auf den nächsten committeten Wert wartet
-  var colonBase = null;         // Ziffern vor dem Doppelpunkt (nur Zeitmodus); null = kein Doppelpunkt-Modus
-  var colonSecCount = 0;        // Anzahl eingegebener Sekundenstellen seit dem letzten ":"
-  var ready = false;            // true, sobald der gespeicherte Zustand geladen wurde
+  var timeWithSecs = false;     // false = H:MM-Modus, true = H:MM:SS-Modus (umschalten mit ":")
+  var ready = false;
 
-  // Getrennter Zustand je Modus, damit der Wechsel den jeweiligen Stand bewahrt.
+  // Getrennter Zustand je Modus.
   var saved = {
-    time: { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null },
+    time: { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null, timeWithSecs:false },
     num:  { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null }
   };
 
@@ -197,7 +238,8 @@
       entry: entry,
       steps: steps.slice(),
       lastEntryWasResult: lastEntryWasResult,
-      pendingOp: pendingOp
+      pendingOp: pendingOp,
+      timeWithSecs: timeWithSecs
     };
   }
   function restoreState(m){
@@ -206,11 +248,10 @@
     steps = s.steps.slice();
     lastEntryWasResult = s.lastEntryWasResult;
     pendingOp = s.pendingOp;
+    timeWithSecs = (m==="time") ? (s.timeWithSecs || false) : false;
   }
 
-  // Dauerhafte Speicherung (überlebt App-Neustart). In manchen Umgebungen
-  // ist localStorage gesperrt -> defensiv abfangen.
-  var STORE_KEY = "zeitrechner-state-v2";
+  var STORE_KEY = "zeitrechner-state-v3";
   function persist(){
     captureState();
     try{
@@ -243,69 +284,79 @@
   function haptic(){ if(navigator.vibrate) try{navigator.vibrate(8);}catch(e){} }
 
   /* ---------- Zeit-Helfer ----------
-     Eingabe im Zeitmodus: Ziffern füllen von rechts SS, dann MM, dann HH.
-     Beispiel: "112" -> 1:12 ,  "12500" -> 1:25:00
+     Zwei Modi:
+     timeWithSecs=false (Standard): Ziffern als H...H:MM — letzte 2 = Minuten, Rest = Stunden
+     timeWithSecs=true:             Ziffern als H...H:MM:SS — letzte 2 = Sek, nächste 2 = Min, Rest = Std
+     Unterstützt bis zu 100.000 Stunden.
   */
+  function pad2(n){ return (n<10?"0":"")+n; }
+
   function digitsToSeconds(d){
     d = d.replace(/\D/g,"");
     if(!d) return 0;
-    // von rechts in 2er-Gruppen: sek, min, std...
-    var s=0, mult=[1,60,3600], gi=0;
-    while(d.length>0 && gi<3){
-      var take = (gi<2)? Math.min(2,d.length) : d.length; // Stunden nehmen Rest
-      var part = d.slice(Math.max(0,d.length-take));
-      d = d.slice(0,Math.max(0,d.length-take));
-      s += parseInt(part,10)*mult[gi];
-      gi++;
+    var s, m, h;
+    if(timeWithSecs){
+      s = Number.parseInt(d.slice(-2)||"0",10);
+      m = Number.parseInt(d.slice(-4,-2)||"0",10);
+      h = Number.parseInt(d.slice(0,-4)||"0",10);
+      return h*3600 + m*60 + s;
     }
-    return s;
+    m = Number.parseInt(d.slice(-2)||"0",10);
+    h = Number.parseInt(d.slice(0,-2)||"0",10);
+    return h*3600 + m*60;
   }
   function fmtTimeFromDigits(d){
-    d=d.replace(/\D/g,"");
+    d = d.replace(/\D/g,"");
     if(!d) return "0:00";
-    var pad=function(n){return (n<10?"0":"")+n;};
-    var sec = parseInt(d.slice(-2)||"0",10);
-    var min = parseInt(d.slice(-4,-2)||"0",10);
-    var hr  = parseInt(d.slice(0,-4)||"0",10);
-    if(hr>0) return hr+":"+pad(min)+":"+pad(sec);
-    return min+":"+pad(sec);
+    var sec, min, hr;
+    if(timeWithSecs){
+      sec = Number.parseInt(d.slice(-2)||"0",10);
+      min = Number.parseInt(d.slice(-4,-2)||"0",10);
+      hr  = Number.parseInt(d.slice(0,-4)||"0",10);
+      return hr>0 ? hr+":"+pad2(min)+":"+pad2(sec) : min+":"+pad2(sec);
+    }
+    min = Number.parseInt(d.slice(-2)||"0",10);
+    hr  = Number.parseInt(d.slice(0,-2)||"0",10);
+    return hr+":"+pad2(min);
   }
   function fmtSeconds(total){
     var neg = total<0; total=Math.abs(Math.round(total));
     var h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
-    var pad=function(n){return (n<10?"0":"")+n;};
-    var str = h>0 ? h+":"+pad(m)+":"+pad(s) : m+":"+pad(s);
+    var str;
+    if(s===0 && h>0) str = h+":"+pad2(m);
+    else if(h>0)     str = h+":"+pad2(m)+":"+pad2(s);
+    else             str = m+":"+pad2(s);
     return (neg?"−":"")+str;
   }
 
   /* ---------- Zahl-Helfer ---------- */
   function fmtNum(n){
-    if(!isFinite(n)) return "—";
+    if(!Number.isFinite(n)) return "—";
     var r = Math.round(n*1e6)/1e6;
     var s = (""+r);
     var parts = s.split(".");
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,".");
-    var out = parts.join(",");
-    return out;
+    return parts.join(",");
   }
 
   /* ---------- Auswertung ---------- */
   function currentValue(){
     if(mode==="time") return digitsToSeconds(entry);
-    return entry==="" ? 0 : parseFloat(entry.replace(",","."));
+    return entry==="" ? 0 : Number.parseFloat(entry.replace(",","."));
   }
-  // Wandelt einen Wert (Sekunden bzw. Zahl) zurück in einen rohen Eingabe-String,
-  // damit das Ergebnis nach "=" im Eingabefeld bearbeitbar weitergeführt werden kann.
   function valueToEntry(v){
     if(mode==="time"){
       var total=Math.abs(Math.round(v));
       var h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
-      var pad=function(n){return (n<10?"0":"")+n;};
-      var str = (h>0 ? (""+h)+pad(m)+pad(s) : (""+m)+pad(s));
-      str = str.replace(/^0+(?=\d)/,""); // führende Nullen weg
-      return str;
+      var str;
+      if(timeWithSecs){
+        str = h>0 ? (""+h)+pad2(m)+pad2(s) : (""+m)+pad2(s);
+      } else {
+        str = (""+h)+pad2(m);
+      }
+      return str.replace(/^0+(?=\d)/,"");
     }
-    if(!isFinite(v)) return "";
+    if(!Number.isFinite(v)) return "";
     var r=Math.round(v*1e6)/1e6;
     return (""+r).replace(".",",");
   }
@@ -332,8 +383,6 @@
     }
     var rel=steps.slice(startIdx);
     if(rel.length===0) return hasSumMarker ? lastSumValue : 0;
-    // op===null markiert den ersten Schritt einer neuen unabhängigen Rechnung.
-    // Alles andere nach einem Summen-Marker bedeutet Fortsetzung vom vorherigen Ergebnis.
     var terms = (hasSumMarker && rel[0].op!==null)
       ? buildTerms(lastSumValue, rel)
       : buildTerms(rel[0].value, rel.slice(1));
@@ -378,17 +427,19 @@
     // Summe
     el.sum.textContent = valueLabel(evaluate());
     // Pending-Operator / aktuelle Eingabe
-    var armedOp = pendingOp;
-    el.pending.textContent = armedOp ? opSymbol(armedOp) : "";
+    el.pending.textContent = pendingOp ? opSymbol(pendingOp) : "";
     if(mode==="time"){
       el.current.textContent = entry==="" ? "0:00" : fmtTimeFromDigits(entry);
     } else {
-      el.current.textContent = entry==="" ? "0" : fmtNum(parseFloat(entry.replace(",",".")));
+      el.current.textContent = entry==="" ? "0" : fmtNum(Number.parseFloat(entry.replace(",",".")));
     }
     // armed operator highlight
     Array.prototype.forEach.call(document.querySelectorAll(".pad .op"),function(b){
       b.classList.toggle("armed", b.dataset.op===pendingOp);
     });
+    // armed colon highlight (Sekunden-Modus aktiv)
+    var colonBtn = el.pad.querySelector(".colon");
+    if(colonBtn && mode==="time") colonBtn.classList.toggle("armed", timeWithSecs);
     if(ready) persist();
   }
 
@@ -400,7 +451,6 @@
     } else if(pendingOp){
       steps.push({op:pendingOp, value:v});
     } else {
-      // Kein Operator gewählt (z. B. neue Eingabe nach Undo): mit + anhängen.
       steps.push({op:"+", value:v});
     }
     entry="";
@@ -409,7 +459,9 @@
   function pressDigit(d){
     if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
     if(mode==="time"){
-      if((entry+d).replace(/\D/g,"").length>6) return; // bis HHMMSS
+      // H:MM: max 9 Ziffern (7 Std + 2 Min), H:MM:SS: max 11 Ziffern
+      var maxLen = timeWithSecs ? 11 : 9;
+      if(entry.length >= maxLen) return;
       entry += d;
     } else {
       if(d==="." || d===","){
@@ -425,8 +477,6 @@
 
   function pressOp(op){
     if(lastEntryWasResult){
-      // Ergebnis als ersten Schritt der neuen Teilrechnung anhängen (Historie bleibt)
-      //steps.push({op:"+", value:currentValue()});
       entry = "";
       lastEntryWasResult = false;
       pendingOp = op;
@@ -444,7 +494,6 @@
     if(lastEntryWasResult) return;
     if(entry!=="") commitEntry();
     if(steps.length===0) return;
-    // Sicherstellen, dass nach dem letzten Summen-Marker noch echte Schritte vorhanden sind.
     var startIdx=0;
     for(var si=steps.length-1;si>=0;si--){
       if(steps[si].type==="sum"){ startIdx=si+1; break; }
@@ -458,21 +507,29 @@
     render();
   }
 
+  function pressColonTime(){
+    // Wechselt zwischen H:MM und H:MM:SS; konvertiert den aktuellen Eingabewert.
+    var v = digitsToSeconds(entry);
+    timeWithSecs = !timeWithSecs;
+    if(entry !== "") entry = valueToEntry(v);
+    render();
+  }
+
   function backspace(){
     if(entry!==""){ entry=entry.slice(0,-1); }
     render();
   }
   function clearAll(){
-    entry=""; steps=[]; pendingOp=null; lastEntryWasResult=false; render();
+    entry=""; steps=[]; pendingOp=null; lastEntryWasResult=false;
+    timeWithSecs=false;
+    render();
   }
   function clearEntry(){
-    // nur die laufende Eingabe verwerfen; Verlauf bleibt
     if(lastEntryWasResult){ clearAll(); return; }
     entry=""; render();
   }
   function undo(){
     if(lastEntryWasResult){
-      // Summen-Marker entfernen (= rückgängig machen), Historie bleibt sonst erhalten.
       lastEntryWasResult = false;
       entry = "";
       pendingOp = null;
@@ -480,9 +537,7 @@
       render();
       return;
     }
-    // Laufende Eingabe verwerfen ...
     if(entry!==""){ entry=""; render(); return; }
-    // ... sonst letzten Verlaufsschritt entfernen.
     if(steps.length>0){ steps.pop(); pendingOp=null; }
     render();
   }
@@ -491,7 +546,7 @@
   function buildPad(){
     el.pad.innerHTML="";
     var sep = mode==="time"
-      ? {t:":",c:"colon sep-hint",a:"sep"}
+      ? {t:":",c:"colon",a:"sep"}
       : {t:",",c:"colon",a:"sep"};
     var rows = [
       [{t:"AC",c:"clear",a:"allclear"}, {t:"C",c:"clear-soft",a:"clear"}, {t:"⌫",c:"fn",a:"back"}, {t:"÷",c:"op",a:"op",op:"/"}],
@@ -518,7 +573,7 @@
           else if(k.a==="clear") clearEntry();
           else if(k.a==="sep") {
             if(mode==="num") pressDigit(",");
-            // im Zeitmodus ist der Doppelpunkt nur visuelle Hilfe -> nichts tun
+            else pressColonTime();
           }
         });
         el.pad.appendChild(b);
@@ -529,21 +584,31 @@
   /* ---------- Modus ---------- */
   function setMode(m){
     if(m===mode) return;
-    captureState();        // aktuellen Modus sichern
+    captureState();
     mode=m;
-    restoreState(m);       // Zielmodus wiederherstellen
+    restoreState(m);
     buildPad();
-    Array.prototype.forEach.call(el.modebar.children,function(btn){
+    Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(btn){
       btn.classList.toggle("active", btn.dataset.mode===m);
     });
     render();
     persist();
   }
   el.modebar.addEventListener("click",function(e){
-    var b=e.target.closest("button"); if(!b) return;
+    var b=e.target.closest(".modetab"); if(!b) return;
     haptic(); setMode(b.dataset.mode);
   });
   el.undo.addEventListener("click",function(){haptic();undo();});
+
+  /* ---------- About-Dialog ---------- */
+  var overlay = document.getElementById("aboutOverlay");
+  document.getElementById("infoBtn").addEventListener("click",function(){
+    haptic(); overlay.style.display="flex";
+  });
+  document.getElementById("aboutClose").addEventListener("click",function(){
+    haptic(); overlay.style.display="none";
+  });
+  overlay.addEventListener("click",function(e){ if(e.target===this) this.style.display="none"; });
 
   /* ---------- Hardware-Tastatur ---------- */
   window.addEventListener("keydown",function(e){
@@ -560,14 +625,10 @@
     else if((k===","||k===".")&&mode==="num"){pressDigit(",");}
   });
 
-  // Version-Badge ausblenden wenn Placeholder nicht ersetzt wurde (lokale Entwicklung).
-  var vh=document.getElementById("versionHint");
-  if(vh && vh.textContent==="__COMMIT__") vh.remove();
-
-  // Gespeicherten Zustand laden und passenden Modus aktivieren.
+  // Gespeicherten Zustand laden.
   loadPersisted();
   restoreState(mode);
-  Array.prototype.forEach.call(el.modebar.children,function(btn){
+  Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(btn){
     btn.classList.toggle("active", btn.dataset.mode===mode);
   });
   buildPad();

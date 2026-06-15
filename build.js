@@ -17,6 +17,6 @@ for (const file of assets) {
 }
 
 const htmlPath = path.join(dist, "index.html");
-fs.writeFileSync(htmlPath, fs.readFileSync(htmlPath, "utf8").replace("__COMMIT__", version));
+fs.writeFileSync(htmlPath, fs.readFileSync(htmlPath, "utf8").replaceAll("__COMMIT__", version));
 
 console.log("Build version:", version);
