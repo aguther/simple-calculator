@@ -56,6 +56,7 @@
     padding:11px 0;border-radius:12px;cursor:pointer;
     transition:background .18s,color .18s;
     font-family:inherit;
+    display:flex;align-items:center;justify-content:center;gap:6px;
   }
   .modebar button.active{background:var(--key);color:var(--txt);}
 
@@ -141,14 +142,14 @@
   .pad .wide{grid-column:span 2;}
   .pad .colon{font-size:clamp(22px,5.6vw,26px);}
   .pad .sep-hint{font-size:13px;color:var(--muted);font-weight:600;letter-spacing:.5px;}
-  .version-hint{align-self:center;font-size:11px;font-weight:600;color:var(--muted);opacity:.45;margin-left:auto;padding-right:4px;font-variant-numeric:tabular-nums;letter-spacing:.5px;}
+  .version-hint{align-self:center;font-size:10px;font-weight:500;color:var(--muted);opacity:.28;margin-left:auto;padding-right:4px;font-variant-numeric:tabular-nums;letter-spacing:.5px;}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="modebar" id="modebar">
-    <button data-mode="time" class="active">Zeit</button>
-    <button data-mode="num">Zahlen</button>
+    <button data-mode="time" class="active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Zeit</button>
+    <button data-mode="num"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>Zahlen</button>
     <span class="version-hint" id="versionHint">__COMMIT__</span>
   </div>
 
@@ -178,9 +179,11 @@
   /* ---------- State ---------- */
   var mode = "time";            // "time" | "num"
   var entry = "";               // rohe Eingabe als String
-  var steps = [];               // {op:'+'|'-'|'*'|'/', value:Number}  (Sekunden bei Zeit, Zahl bei num)
+  var steps = [];               // {op:'+'|'-'|'*'|'/'|null, value:Number} | {type:'sum', value:Number}
   var lastEntryWasResult = false;
   var pendingOp = null;         // Operator, der auf den nächsten committeten Wert wartet
+  var colonBase = null;         // Ziffern vor dem Doppelpunkt (nur Zeitmodus); null = kein Doppelpunkt-Modus
+  var colonSecCount = 0;        // Anzahl eingegebener Sekundenstellen seit dem letzten ":"
   var ready = false;            // true, sobald der gespeicherte Zustand geladen wurde
 
   // Getrennter Zustand je Modus, damit der Wechsel den jeweiligen Stand bewahrt.
@@ -207,7 +210,7 @@
 
   // Dauerhafte Speicherung (überlebt App-Neustart). In manchen Umgebungen
   // ist localStorage gesperrt -> defensiv abfangen.
-  var STORE_KEY = "zeitrechner-state-v1";
+  var STORE_KEY = "zeitrechner-state-v2";
   function persist(){
     captureState();
     try{
@@ -317,19 +320,27 @@
       } else j++;
     }
   }
+  function buildTerms(startValue, items){
+    var nums=[startValue], ops=[];
+    for(var t of items){ ops.push(t.op); nums.push(t.value); }
+    return {nums:nums, ops:ops};
+  }
   function evaluate(){
-    var startIdx=0, lastSumValue=0;
+    var startIdx=0, lastSumValue=0, hasSumMarker=false;
     for(var si=steps.length-1;si>=0;si--){
-      if(steps[si].type==="sum"){ startIdx=si+1; lastSumValue=steps[si].value; break; }
+      if(steps[si].type==="sum"){ startIdx=si+1; lastSumValue=steps[si].value; hasSumMarker=true; break; }
     }
     var rel=steps.slice(startIdx);
-    if(rel.length===0) return lastSumValue;
-    var nums=[rel[0].value], ops=[];
-    for(var ri=1;ri<rel.length;ri++){ ops.push(rel[ri].op); nums.push(rel[ri].value); }
-    applyMulDiv(nums, ops);
-    var acc=nums[0];
-    for(var k=0;k<ops.length;k++){
-      acc=ops[k]==="+"?acc+nums[k+1]:acc-nums[k+1];
+    if(rel.length===0) return hasSumMarker ? lastSumValue : 0;
+    // op===null markiert den ersten Schritt einer neuen unabhängigen Rechnung.
+    // Alles andere nach einem Summen-Marker bedeutet Fortsetzung vom vorherigen Ergebnis.
+    var terms = (hasSumMarker && rel[0].op!==null)
+      ? buildTerms(lastSumValue, rel)
+      : buildTerms(rel[0].value, rel.slice(1));
+    applyMulDiv(terms.nums, terms.ops);
+    var acc=terms.nums[0];
+    for(var k=0;k<terms.ops.length;k++){
+      acc=terms.ops[k]==="+"?acc+terms.nums[k+1]:acc-terms.nums[k+1];
     }
     return acc;
   }
