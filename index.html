@@ -134,9 +134,9 @@
     grid-template-columns:repeat(4,1fr);
     padding-bottom:4px; /* Browser-Modus: nur mini Abstand */
   }
-  /* Im PWA/Standalone-Modus kein Browser-Toolbar → echten Safe-Area-Abstand nutzen */
+  /* Im PWA/Standalone-Modus näher an den Home Indicator rücken, ohne ihn komplett zu ignorieren. */
   @media (display-mode: standalone){
-    .pad{ padding-bottom:calc(var(--safe-b) + 4px); }
+    .pad{ padding-bottom:max(8px, calc(var(--safe-b) - 18px)); }
   }
   .pad button{
     border:0;border-radius:16px;cursor:pointer;
