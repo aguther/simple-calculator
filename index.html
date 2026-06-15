@@ -352,14 +352,7 @@
   function render(){
     // Tape
     el.tape.innerHTML="";
-    if(steps.length===0){
-      var e=document.createElement("div");
-      e.className="tape-empty";
-      e.textContent = mode==="time"
-        ? "Zeiten eingeben, z. B. 1 12 für 1:12, dann + oder − tippen."
-        : "Zahl eingeben und mit + − × ÷ verketten.";
-      el.tape.appendChild(e);
-    } else {
+    if(steps.length!==0){
       var stepNum=0, firstInGroup=true;
       steps.forEach(function(st){
         var row=document.createElement("div");
@@ -433,7 +426,7 @@
   function pressOp(op){
     if(lastEntryWasResult){
       // Ergebnis als ersten Schritt der neuen Teilrechnung anhängen (Historie bleibt)
-      steps.push({op:"+", value:currentValue()});
+      //steps.push({op:"+", value:currentValue()});
       entry = "";
       lastEntryWasResult = false;
       pendingOp = op;
