@@ -1,5 +1,6 @@
-const { execSync } = require("child_process");
-const fs = require("fs");
+const { execSync } = require("node:child_process");
+const fs = require("node:fs");
+const path = require("node:path");
 
 let sha = process.env.CF_PAGES_COMMIT_SHA || "";
 if (!sha) {
@@ -7,6 +8,15 @@ if (!sha) {
 }
 const version = sha ? sha.slice(0, 7) : "dev";
 
-const html = fs.readFileSync("index.html", "utf8").replace("__COMMIT__", version);
-fs.writeFileSync("index.html", html);
+const dist = path.join(__dirname, "dist");
+if (!fs.existsSync(dist)) fs.mkdirSync(dist);
+
+const assets = ["index.html", "sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+for (const file of assets) {
+  fs.copyFileSync(path.join(__dirname, file), path.join(dist, file));
+}
+
+const htmlPath = path.join(dist, "index.html");
+fs.writeFileSync(htmlPath, fs.readFileSync(htmlPath, "utf8").replace("__COMMIT__", version));
+
 console.log("Build version:", version);
