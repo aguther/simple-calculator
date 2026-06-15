@@ -29,18 +29,18 @@
     --safe-t:env(safe-area-inset-top,0px);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html{height:100%;margin:0;}
-  body{height:100%;margin:0;overflow:hidden;
-    background:var(--bg);
-    color:var(--txt);
+  html,body{height:100%;margin:0;overflow:hidden;
+    background:var(--bg);color:var(--txt);
     font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
-    display:flex;justify-content:center;
     user-select:none;-webkit-user-select:none;
     overscroll-behavior:none;
   }
   button{touch-action:manipulation;}
+  /* position:fixed ist auf iOS Safari zuverlässiger als vh/dvh-Höhen-Kaskaden */
   .app{
-    width:100%;max-width:480px;height:100%;overflow:hidden;
+    position:fixed;top:0;right:0;bottom:0;left:0;
+    max-width:480px;margin:0 auto;
+    overflow:hidden;
     display:flex;flex-direction:column;
     padding:calc(var(--safe-t) + 6px) 12px calc(var(--safe-b) + 4px);
   }
