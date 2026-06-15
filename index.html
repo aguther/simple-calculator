@@ -134,9 +134,9 @@
     grid-template-columns:repeat(4,1fr);
     padding-bottom:4px; /* Browser-Modus: nur mini Abstand */
   }
-  /* Im PWA/Standalone-Modus näher an den Home Indicator rücken, ohne ihn komplett zu ignorieren. */
+  /* PWA/Standalone: native App-Optik – Keypad bewusst näher an den unteren Rand */
   @media (display-mode: standalone){
-    .pad{ padding-bottom:max(8px, calc(var(--safe-b) - 18px)); }
+    .pad{ padding-bottom:8px; }
   }
   .pad button{
     border:0;border-radius:16px;cursor:pointer;
