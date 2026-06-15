@@ -145,9 +145,35 @@
     font-size:clamp(22px,6vw,28px);
     color:var(--txt);background:var(--key);
     display:flex;align-items:center;justify-content:center;
-    transition:transform .06s, background .12s;
+    transition:transform .08s ease-out, background .12s ease-out, filter .12s ease-out;
+    will-change:transform;
   }
-  .pad button:active{transform:scale(.95);background:var(--key-press);}
+  .pad button:active,
+  .pad button.is-pressed{
+    transform:scale(.94);
+    filter:brightness(1.12);
+  }
+  .pad button.key-pop{
+    animation:key-pop .16s ease-out;
+  }
+  @keyframes key-pop{
+    0%{transform:scale(.94);}
+    65%{transform:scale(1.03);}
+    100%{transform:scale(1);}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pad button{
+      transition:filter .12s ease-out;
+    }
+    .pad button:active,
+    .pad button.is-pressed{
+      transform:none;
+      filter:brightness(1.1);
+    }
+    .pad button.key-pop{
+      animation:none;
+    }
+  }
   .pad .fn{color:var(--muted);}
   .pad .clear{background:#3a201d;color:var(--red);font-weight:700;}
   .pad .clear-soft{background:var(--key);color:var(--red);font-weight:700;}
@@ -284,6 +310,23 @@
   };
 
   function haptic(){ if(navigator.vibrate) try{navigator.vibrate(8);}catch(e){} }
+
+  function pressKeyVisual(button){
+    button.classList.remove("key-pop");
+    button.classList.add("is-pressed");
+  }
+
+  function releaseKeyVisual(button){
+    if(!button.classList.contains("is-pressed")) return;
+    button.classList.remove("is-pressed");
+    button.classList.remove("key-pop");
+    // Reflow erzwingen, damit wiederholtes schnelles Tippen die Animation neu startet.
+    void button.offsetWidth;
+    button.classList.add("key-pop");
+    window.setTimeout(function(){
+      button.classList.remove("key-pop");
+    }, 180);
+  }
 
   /* ---------- Zeit-Helfer ----------
      Ohne ":" im entry: Auto-Modus — letzte 2 Ziffern = Minuten, Rest = Stunden (H:MM).
@@ -580,6 +623,10 @@
         if(k.c) b.className=k.c;
         if(k.wide) b.classList.add("wide");
         if(k.op) b.dataset.op=k.op;
+        b.addEventListener("pointerdown",function(){ pressKeyVisual(b); });
+        b.addEventListener("pointerup",function(){ releaseKeyVisual(b); });
+        b.addEventListener("pointercancel",function(){ releaseKeyVisual(b); });
+        b.addEventListener("pointerleave",function(){ releaseKeyVisual(b); });
         b.addEventListener("click",function(){
           haptic();
           if(k.a==="d") pressDigit(k.t);
