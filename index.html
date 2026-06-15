@@ -29,8 +29,8 @@
     --safe-t:env(safe-area-inset-top,0px);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;margin:0;overflow:hidden;}
-  body{
+  html{height:100%;margin:0;}
+  body{height:100%;margin:0;overflow:hidden;
     background:var(--bg);
     color:var(--txt);
     font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
@@ -40,7 +40,7 @@
   }
   button{touch-action:manipulation;}
   .app{
-    width:100%;max-width:480px;height:100dvh;overflow:hidden;
+    width:100%;max-width:480px;height:100%;overflow:hidden;
     display:flex;flex-direction:column;
     padding:calc(var(--safe-t) + 6px) 12px calc(var(--safe-b) + 4px);
   }
@@ -124,7 +124,7 @@
     font-variant-numeric:tabular-nums;
     display:flex;flex-direction:column;justify-content:flex-end;
   }
-  .display .pending{color:var(--muted);font-size:16px;line-height:20px;font-weight:500;letter-spacing:.5px;}
+  .display .pending{color:var(--muted);font-size:16px;height:20px;line-height:20px;font-weight:500;letter-spacing:.5px;}
   .display .current{color:var(--amber);font-size:clamp(40px,11vw,58px);font-weight:600;line-height:1;letter-spacing:1px;}
 
   /* ---- Keypad ---- */
