@@ -25,6 +25,8 @@
     --red:#b84a3f;
     --green:#5aa66a;
     --radius:20px;
+    --minutes-col:92px;
+    --time-col:96px;
     --safe-b:env(safe-area-inset-bottom,0px);
     --safe-t:env(safe-area-inset-top,0px);
   }
@@ -98,7 +100,17 @@
     flex:1 1 auto;
     min-width:0;
     text-align:right;
+    display:flex;align-items:baseline;justify-content:flex-end;gap:8px;
+  }
+  .row .val-main{
+    order:2;
+    flex:0 0 var(--time-col);text-align:right;
     font-size:20px;font-weight:600;letter-spacing:.5px;font-variant-numeric:tabular-nums;
+  }
+  .row .val-minutes{
+    order:1;
+    color:var(--muted);font-size:12px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;
+    flex:0 0 var(--minutes-col);text-align:right;white-space:nowrap;
   }
   .tape-empty{
     color:var(--muted);font-size:13px;text-align:center;
@@ -110,17 +122,24 @@
     padding:10px 16px;
   }
   .total .lbl{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:2px;}
-  .total .right{display:flex;align-items:center;gap:12px;}
-  .total .sum{color:var(--amber);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .total .right{display:flex;align-items:center;}
+  .total-value{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
+  .total .sum{order:3;color:var(--amber);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;flex:0 0 var(--time-col);text-align:right;}
+  .total .sum-minutes{order:1;color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;line-height:14px;flex:0 0 var(--minutes-col);text-align:right;white-space:nowrap;}
   .undo{
     width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
     background:#2b2b31;color:var(--muted);font-size:15px;
     display:flex;align-items:center;justify-content:center;
+    order:2;
   }
   .undo:active{background:var(--key-press);}
   .row.sum-divider{background:var(--amber-soft);border:1px solid rgba(232,148,58,.22);}
   .row.sum-divider .sum-eq{color:var(--amber);font-size:18px;font-weight:700;width:24px;text-align:center;flex:0 0 auto;}
-  .row.sum-divider .val{color:var(--amber);}
+  .row.sum-divider .val-main{color:var(--amber);}
+  .row.sum-divider .val-minutes{color:rgba(245,243,239,.62);}
+  .row.paren-row{background:transparent;padding-top:3px;padding-bottom:3px;}
+  .row.paren-row .idx{background:transparent;}
+  .row.paren-row .val-main{color:var(--muted);font-size:18px;}
 
   /* ---- Live display ---- */
   .display{
@@ -130,7 +149,10 @@
     display:flex;flex-direction:column;justify-content:flex-end;
   }
   .display .pending{color:var(--muted);font-size:16px;height:20px;line-height:20px;font-weight:500;letter-spacing:.5px;}
-  .display .current{color:var(--amber);font-size:clamp(40px,11vw,58px);font-weight:600;line-height:1;letter-spacing:1px;}
+  .display .current-line{display:flex;align-items:baseline;justify-content:flex-end;gap:10px;min-width:0;}
+  .display .current{color:var(--amber);font-size:clamp(40px,11vw,58px);font-weight:600;line-height:1;letter-spacing:1px;text-align:right;min-width:0;}
+  .display .current.compact{font-size:clamp(32px,8.4vw,46px);}
+  .display .current.tiny{font-size:clamp(24px,6.4vw,34px);}
 
   /* ---- Keypad ---- */
   .pad{
@@ -139,6 +161,20 @@
     grid-template-columns:repeat(4,1fr);
     padding-bottom:4px; /* Browser-Modus: nur mini Abstand */
   }
+  .parenbar{
+    flex:0 0 auto;
+    display:grid;grid-template-columns:repeat(2,1fr);gap:7px;
+    margin-bottom:7px;
+  }
+  .parenbar button{
+    border:0;border-radius:12px;cursor:pointer;
+    font-family:inherit;font-weight:700;
+    height:34px;font-size:18px;
+    color:var(--muted);background:var(--key);
+    display:flex;align-items:center;justify-content:center;
+    transition:background .10s ease-out, filter .10s ease-out;
+  }
+  .parenbar button:active{background:var(--key-press);filter:brightness(1.18);}
   /* PWA/Standalone: native App-Optik – Keypad bewusst näher an den unteren Rand */
   @media (display-mode: standalone){
     .pad{ padding-bottom:8px; }
@@ -249,15 +285,25 @@
     <div class="total">
       <span class="lbl">SUMME</span>
       <div class="right">
-        <button class="undo" id="undo" aria-label="Letzten Schritt zurück">↺</button>
-        <span class="sum" id="sum">0</span>
+        <div class="total-value">
+          <span class="sum-minutes" id="sumMinutes"></span>
+          <button class="undo" id="undo" aria-label="Letzten Schritt zurück">↺</button>
+          <span class="sum" id="sum">0</span>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="display">
     <div class="pending" id="pending"></div>
-    <div class="current" id="current">0</div>
+    <div class="current-line">
+      <div class="current" id="current">0</div>
+    </div>
+  </div>
+
+  <div class="parenbar">
+    <button id="openParen" aria-label="Klammer auf">(</button>
+    <button id="closeParen" aria-label="Klammer zu">)</button>
   </div>
 
   <div class="pad" id="pad"></div>
@@ -330,6 +376,7 @@
   var el = {
     tape: document.getElementById("tape"),
     sum: document.getElementById("sum"),
+    sumMinutes: document.getElementById("sumMinutes"),
     pending: document.getElementById("pending"),
     current: document.getElementById("current"),
     pad: document.getElementById("pad"),
@@ -364,6 +411,12 @@
      Beispiele: "145"→1:45, "1:45"→1:45, "1:1"→1:10, "1::15"→1:00:15
   */
   function pad2(n){ return (n<10?"0":"")+n; }
+  function groupInt(n){
+    return (""+n).replace(/\B(?=(\d{3})+(?!\d))/g,".");
+  }
+  function parseIntLoose(s){
+    return Number.parseInt((""+s).replace(/\./g,"")||"0",10);
+  }
 
   function entryToSeconds(e){
     if(!e) return 0;
@@ -371,11 +424,11 @@
     if(!e.includes(":")){
       // Auto-Modus: letzte 2 = Min, Rest = Std
       m = Number.parseInt(e.slice(-2)||"0",10);
-      h = Number.parseInt(e.slice(0,-2)||"0",10);
+      h = parseIntLoose(e.slice(0,-2)||"0");
       return h*3600 + m*60;
     }
     parts = e.split(":");
-    h = Number.parseInt(parts[0]||"0",10);
+    h = parseIntLoose(parts[0]||"0");
     mStr = parts[1]||"";
     m = Number.parseInt(mStr||"0",10);
     if(mStr.length===1) m *= 10; // Zehnerstelle
@@ -393,11 +446,11 @@
     if(!e.includes(":")){
       // Auto-Modus
       m = Number.parseInt(e.slice(-2)||"0",10);
-      h = Number.parseInt(e.slice(0,-2)||"0",10);
-      return h+":"+pad2(m);
+      h = parseIntLoose(e.slice(0,-2)||"0");
+      return groupInt(h)+":"+pad2(m);
     }
     parts = e.split(":");
-    h = parts[0]||"0";
+    h = groupInt(parseIntLoose(parts[0]||"0"));
     mStr = parts[1]||"";
     if(mStr.length===0) mDisp="00"; else if(mStr.length===1) mDisp=mStr+"0"; else mDisp=mStr;
     if(parts.length===2) return h+":"+mDisp;
@@ -406,30 +459,41 @@
     return h+":"+mDisp+":"+sDisp;
   }
   function fmtSeconds(total){
+    if(!Number.isFinite(total)) return "—";
     var neg = total<0; total=Math.abs(Math.round(total));
     var h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
     var str;
     // Zeitwerte in der App immer als H:MM bzw. H:MM:SS darstellen.
     // Dadurch wird z. B. 25 Minuten konsistent als 0:25 und nicht als 25:00 angezeigt.
-    if(s===0) str = h+":"+pad2(m);
-    else      str = h+":"+pad2(m)+":"+pad2(s);
+    if(s===0) str = groupInt(h)+":"+pad2(m);
+    else      str = groupInt(h)+":"+pad2(m)+":"+pad2(s);
     return (neg?"−":"")+str;
+  }
+  function fmtMinutes(total){
+    if(!Number.isFinite(total)) return "—";
+    return fmtNum(total/60).replace("-", "−")+" min";
   }
 
   /* ---------- Zahl-Helfer ---------- */
   function fmtNum(n){
     if(!Number.isFinite(n)) return "—";
     var r = Math.round(n*1e6)/1e6;
-    var s = (""+r);
-    var parts = s.split(".");
-    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g,".");
-    return parts.join(",");
+    return r.toLocaleString("de-DE", {maximumFractionDigits:6});
   }
 
   /* ---------- Auswertung ---------- */
   function currentValue(){
-    if(mode==="time") return entryToSeconds(entry);
-    return entry==="" ? 0 : Number.parseFloat(entry.replace(",","."));
+    return entryValueForOp(opForNextValue());
+  }
+  function numberEntryValue(e){
+    return e==="" ? 0 : Number.parseFloat(e.replace(/\./g,"").replace(",","."));
+  }
+  function isScalarTimeEntry(op){
+    return mode==="time" && (op==="*"||op==="/") && entry!=="" && !entry.includes(":");
+  }
+  function entryValueForOp(op){
+    if(mode==="time") return isScalarTimeEntry(op) ? numberEntryValue(entry) : entryToSeconds(entry);
+    return numberEntryValue(entry);
   }
   function valueToEntry(v){
     if(mode==="time"){
@@ -443,84 +507,157 @@
     var r=Math.round(v*1e6)/1e6;
     return (""+r).replace(".",",");
   }
-  function applyMulDiv(nums, ops){
-    var j=0;
-    while(j<ops.length){
-      if(ops[j]==="*"||ops[j]==="/"){
-        var a=nums[j], b=nums[j+1];
-        var div=b===0?Number.NaN:a/b;
-        var r=ops[j]==="*"?a*b:div;
-        nums.splice(j,2,r); ops.splice(j,1);
-      } else j++;
-    }
+  function precedence(op){ return (op==="*"||op==="/") ? 2 : 1; }
+  function applyOp(values, op){
+    var b=values.pop(), a=values.pop();
+    if(a===undefined || b===undefined) return false;
+    if(op==="+") values.push(a+b);
+    else if(op==="-") values.push(a-b);
+    else if(op==="*") values.push(a*b);
+    else if(op==="/") values.push(b===0 ? Number.NaN : a/b);
+    return true;
   }
-  function buildTerms(startValue, items){
-    var nums=[startValue], ops=[];
-    for(var t of items){ ops.push(t.op); nums.push(t.value); }
-    return {nums:nums, ops:ops};
-  }
-  function evaluate(){
+  function lastSumInfo(){
     var startIdx=0, lastSumValue=0, hasSumMarker=false;
     for(var si=steps.length-1;si>=0;si--){
       if(steps[si].type==="sum"){ startIdx=si+1; lastSumValue=steps[si].value; hasSumMarker=true; break; }
     }
-    var rel=steps.slice(startIdx);
-    if(rel.length===0) return hasSumMarker ? lastSumValue : 0;
-    var terms = (hasSumMarker && rel[0].op!==null)
-      ? buildTerms(lastSumValue, rel)
-      : buildTerms(rel[0].value, rel.slice(1));
-    applyMulDiv(terms.nums, terms.ops);
-    var acc=terms.nums[0];
-    for(var k=0;k<terms.ops.length;k++){
-      acc=terms.ops[k]==="+"?acc+terms.nums[k+1]:acc-terms.nums[k+1];
+    return {startIdx:startIdx, lastSumValue:lastSumValue, hasSumMarker:hasSumMarker};
+  }
+  function expressionSteps(){
+    var info=lastSumInfo();
+    return steps.slice(info.startIdx).filter(function(st){ return st.type!=="sum"; });
+  }
+  function expressionTokens(){
+    var info=lastSumInfo();
+    var rel=steps.slice(info.startIdx);
+    rel = rel.filter(function(st){ return st.type!=="sum"; });
+    var tokens=[];
+    rel.forEach(function(st){
+      if(st.type==="paren"){
+        if(st.value==="(" && st.op) tokens.push({type:"op", op:st.op});
+        tokens.push({type:"paren", value:st.value});
+      } else {
+        if(tokens.length===0){
+          if(info.hasSumMarker && st.op){
+            tokens.push({type:"num", value:info.lastSumValue});
+            tokens.push({type:"op", op:st.op});
+          }
+        } else if(st.op){
+          tokens.push({type:"op", op:st.op});
+        }
+        tokens.push({type:"num", value:st.value});
+      }
+    });
+    if(tokens.length===0 && info.hasSumMarker) tokens.push({type:"num", value:info.lastSumValue});
+    return tokens;
+  }
+  function evaluateTokens(tokens){
+    if(tokens.length===0) return 0;
+    var values=[], ops=[];
+    for(var i=0;i<tokens.length;i++){
+      var tok=tokens[i];
+      if(tok.type==="num"){
+        values.push(tok.value);
+      } else if(tok.type==="op"){
+        while(ops.length && ops[ops.length-1]!=="(" && precedence(ops[ops.length-1])>=precedence(tok.op)){
+          if(!applyOp(values, ops.pop())) return Number.NaN;
+        }
+        ops.push(tok.op);
+      } else if(tok.value==="("){
+        ops.push("(");
+      } else if(tok.value===")"){
+        while(ops.length && ops[ops.length-1]!=="("){
+          if(!applyOp(values, ops.pop())) return Number.NaN;
+        }
+        if(!ops.length) return Number.NaN;
+        ops.pop();
+      }
     }
-    return acc;
+    while(ops.length){
+      var op=ops.pop();
+      if(op==="(") return Number.NaN;
+      if(!applyOp(values, op)) return Number.NaN;
+    }
+    return values.length===1 ? values[0] : Number.NaN;
+  }
+  function evaluate(){
+    return evaluateTokens(expressionTokens());
   }
 
   /* ---------- Rendering ---------- */
   function opSymbol(op){return op==="*"?"×":op==="/"?"÷":op==="-"?"−":"+";}
-  function valueLabel(v){ return mode==="time"? fmtSeconds(v) : fmtNum(v); }
+  function valueLabel(v, unit){ return mode==="time" && unit!=="scalar" ? fmtSeconds(v) : fmtNum(v); }
+  function appendValueLabel(parent, value, unit){
+    var main=document.createElement("div");
+    main.className="val-main";
+    main.textContent=valueLabel(value, unit);
+    parent.appendChild(main);
+    if(mode==="time" && unit!=="scalar"){
+      var minutes=document.createElement("div");
+      minutes.className="val-minutes";
+      minutes.textContent=fmtMinutes(value);
+      parent.appendChild(minutes);
+    }
+  }
 
   function render(){
     // Tape
     el.tape.innerHTML="";
     if(steps.length!==0){
-      var stepNum=0, firstInGroup=true;
+      var stepNum=0, firstInGroup=true, afterSum=false;
       steps.forEach(function(st){
         var row=document.createElement("div");
-        var val=document.createElement("div"); val.className="val"; val.textContent=valueLabel(st.value);
         if(st.type==="sum"){
+          var val=document.createElement("div"); val.className="val"; appendValueLabel(val, st.value, st.unit);
           row.className="row sum-divider";
           var eq=document.createElement("div"); eq.className="sum-eq"; eq.textContent="=";
           var sp=document.createElement("div"); sp.style.flex="1";
           row.appendChild(eq); row.appendChild(sp); row.appendChild(val);
           firstInGroup=true;
+          afterSum=true;
+        } else if(st.type==="paren"){
+          row.className="row paren-row";
+          var idxParen=document.createElement("div"); idxParen.className="idx"; idxParen.textContent="";
+          var opParen=document.createElement("div"); opParen.className="op"; opParen.textContent=st.op?opSymbol(st.op):"";
+          var valParen=document.createElement("div"); valParen.className="val";
+          var mainParen=document.createElement("div"); mainParen.className="val-main"; mainParen.textContent=st.value;
+          valParen.appendChild(mainParen);
+          row.appendChild(idxParen); row.appendChild(opParen); row.appendChild(valParen);
+          firstInGroup = st.value==="(";
+          afterSum=false;
         } else {
+          var val=document.createElement("div"); val.className="val"; appendValueLabel(val, st.value, st.unit);
           stepNum++;
           row.className="row";
           var idx=document.createElement("div"); idx.className="idx"; idx.textContent=stepNum;
-          var op=document.createElement("div"); op.className="op"; op.textContent=firstInGroup?"":opSymbol(st.op);
+          var op=document.createElement("div"); op.className="op"; op.textContent=st.op&&(!firstInGroup||afterSum)?opSymbol(st.op):"";
           row.appendChild(idx); row.appendChild(op); row.appendChild(val);
           firstInGroup=false;
+          afterSum=false;
         }
         el.tape.appendChild(row);
       });
       el.tape.scrollTop = el.tape.scrollHeight;
     }
     // Summe
-    el.sum.textContent = valueLabel(evaluate());
+    var totalValue = evaluate();
+    el.sum.textContent = valueLabel(totalValue);
+    el.sumMinutes.textContent = mode==="time" ? fmtMinutes(totalValue) : "";
     // Pending-Operator / aktuelle Eingabe
     el.pending.textContent = pendingOp ? opSymbol(pendingOp) : "";
     if(mode==="time"){
-      el.current.textContent = entry==="" ? "0:00" : fmtTimeEntry(entry);
+      el.current.textContent = isScalarTimeEntry(opForNextValue()) ? fmtNum(numberEntryValue(entry)) : (entry==="" ? "0:00" : fmtTimeEntry(entry));
     } else if(entry===""){
       el.current.textContent = "0";
     } else if(entry.endsWith(",")){
       // Komma sofort sichtbar machen
       el.current.textContent = fmtNum(Number.parseFloat(entry.slice(0,-1).replace(",",".")||"0"))+",";
     } else {
-      el.current.textContent = fmtNum(Number.parseFloat(entry.replace(",",".")));
+      el.current.textContent = fmtNum(Number.parseFloat(entry.replace(/\./g,"").replace(",",".")));
     }
+    el.current.classList.toggle("compact", el.current.textContent.length>12);
+    el.current.classList.toggle("tiny", el.current.textContent.length>18);
     // armed operator highlight
     Array.prototype.forEach.call(document.querySelectorAll(".pad .op"),function(b){
       b.classList.toggle("armed", b.dataset.op===pendingOp);
@@ -532,20 +669,40 @@
   }
 
   /* ---------- Eingabelogik ---------- */
-  function commitEntry(){
-    var v = currentValue();
-    if(steps.length===0){
-      steps.push({op:"+", value:v});
-    } else if(pendingOp){
-      steps.push({op:pendingOp, value:v});
-    } else {
-      steps.push({op:"+", value:v});
-    }
+  function lastExprStep(){
+    var rel=expressionSteps();
+    return rel.length ? rel[rel.length-1] : null;
+  }
+  function isValueStep(st){ return st && st.type!=="sum" && st.type!=="paren"; }
+  function canStartValue(){
+    var last=lastExprStep();
+    return !last || pendingOp || (last.type==="paren" && last.value==="(");
+  }
+  function openParenCount(){
+    return expressionSteps().reduce(function(acc, st){
+      if(st.type==="paren" && st.value==="(") return acc+1;
+      if(st.type==="paren" && st.value===")") return acc-1;
+      return acc;
+    },0);
+  }
+  function opForNextValue(){
+    var last=lastExprStep();
+    if(!last) return pendingOp || null;
+    if(last.type==="paren" && last.value==="(") return null;
+    return pendingOp || "+";
+  }
+  function commitEntry(valueOverride){
+    var op=opForNextValue();
+    var scalar=isScalarTimeEntry(op);
+    var v = valueOverride===undefined ? entryValueForOp(op) : valueOverride;
+    steps.push({op:op, value:v, unit:scalar?"scalar":undefined});
     entry="";
+    pendingOp=null;
   }
 
   function pressDigit(d){
     if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
+    if(!canStartValue()) return;
     if(mode==="time"){
       var parts = entry.split(":");
       var colons = parts.length-1;
@@ -573,8 +730,17 @@
       render();
       return;
     }
-    if(entry!=="" || steps.length===0){
+    if(entry!==""){
       commitEntry();
+    }
+    var last=lastExprStep();
+    if(!last){
+      commitEntry(0);
+    } else if(last.type==="paren" && last.value==="("){
+      if(op==="-") commitEntry(0);
+      else return;
+    } else if(!isValueStep(last) && !(last.type==="paren" && last.value===")")){
+      return;
     }
     pendingOp = op;
     render();
@@ -583,13 +749,12 @@
   function pressEquals(){
     if(lastEntryWasResult) return;
     if(entry!=="") commitEntry();
-    if(steps.length===0) return;
-    var startIdx=0;
-    for(var si=steps.length-1;si>=0;si--){
-      if(steps[si].type==="sum"){ startIdx=si+1; break; }
-    }
-    if(startIdx>=steps.length) return;
+    if(expressionSteps().length===0) return;
+    if(openParenCount()!==0) return;
+    var last=lastExprStep();
+    if(!isValueStep(last) && !(last && last.type==="paren" && last.value===")")) return;
     var res = evaluate();
+    if(!Number.isFinite(res)) return;
     steps.push({type:"sum", value:res});
     entry = valueToEntry(res);
     pendingOp = null;
@@ -599,14 +764,41 @@
 
   function pressColonTime(){
     if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
+    if(!canStartValue()) return;
     var colons = (entry.match(/:/g)||[]).length;
     if(colons>=2) return; // max. 2 Doppelpunkte (H:MM:SS)
     entry += ":";
     render();
   }
+  function pressOpenParen(){
+    if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
+    if(entry!=="") commitEntry();
+    var last=lastExprStep();
+    var op=null;
+    if(last && (isValueStep(last) || (last.type==="paren" && last.value===")"))){
+      op=pendingOp || "*";
+    } else {
+      op=pendingOp;
+    }
+    steps.push({type:"paren", value:"(", op:op});
+    pendingOp=null;
+    render();
+  }
+  function pressCloseParen(){
+    if(lastEntryWasResult) return;
+    if(entry!=="") commitEntry();
+    if(openParenCount()<=0) return;
+    var last=lastExprStep();
+    if(!isValueStep(last) && !(last && last.type==="paren" && last.value===")")) return;
+    steps.push({type:"paren", value:")"});
+    pendingOp=null;
+    render();
+  }
 
   function backspace(){
     if(entry!==""){ entry=entry.slice(0,-1); }
+    else if(pendingOp){ pendingOp=null; }
+    else if(steps.length>0){ steps.pop(); }
     render();
   }
   function clearAll(){
@@ -627,6 +819,7 @@
       return;
     }
     if(entry!==""){ entry=""; render(); return; }
+    if(pendingOp){ pendingOp=null; render(); return; }
     if(steps.length>0){ steps.pop(); pendingOp=null; }
     render();
   }
@@ -692,6 +885,8 @@
     haptic(); setMode(b.dataset.mode);
   });
   el.undo.addEventListener("click",function(){haptic();undo();});
+  document.getElementById("openParen").addEventListener("click",function(){haptic();pressOpenParen();});
+  document.getElementById("closeParen").addEventListener("click",function(){haptic();pressCloseParen();});
 
   /* ---------- About-Dialog ---------- */
   var overlay = document.getElementById("aboutOverlay");
@@ -712,6 +907,8 @@
     else if(k==="*"){pressOp("*");}
     else if(k==="/"){e.preventDefault();pressOp("/");}
     else if(k==="Enter"||k==="="){e.preventDefault();pressEquals();}
+    else if(k==="("){pressOpenParen();}
+    else if(k===")"){pressCloseParen();}
     else if(k==="Backspace"){backspace();}
     else if(k==="Escape"){clearAll();}
     else if(k==="Delete"){clearEntry();}

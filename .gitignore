@@ -1,0 +1,8 @@
+dist/
+node_modules/
+
+.codex-http-server.pid
+*.log
+
+.DS_Store
+Thumbs.db
