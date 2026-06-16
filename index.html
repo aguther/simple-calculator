@@ -412,10 +412,10 @@
   */
   function pad2(n){ return (n<10?"0":"")+n; }
   function groupInt(n){
-    return (""+n).replace(/\B(?=(\d{3})+(?!\d))/g,".");
+    return (""+n).replace(/\B(?=(\d{3})+(?!\d))/g," ");
   }
   function parseIntLoose(s){
-    return Number.parseInt((""+s).replace(/\./g,"")||"0",10);
+    return Number.parseInt((""+s).replace(/[.\s]/g,"")||"0",10);
   }
 
   function entryToSeconds(e){
@@ -478,7 +478,20 @@
   function fmtNum(n){
     if(!Number.isFinite(n)) return "—";
     var r = Math.round(n*1e6)/1e6;
-    return r.toLocaleString("de-DE", {maximumFractionDigits:6});
+    var s = (""+r);
+    var parts = s.split(".");
+    parts[0] = groupInt(parts[0]);
+    return parts.join(".");
+  }
+  function fmtNumEntry(e){
+    if(!e) return "0";
+    var raw = e.replace(/[,\s]/g,"");
+    var parts = raw.split(".");
+    var intPart = parts[0] || "0";
+    var intValue = Number.parseInt(intPart,10);
+    var out = groupInt(Number.isFinite(intValue) ? intValue : 0);
+    if(raw.includes(".")) out += "." + (parts[1] || "");
+    return out;
   }
 
   /* ---------- Auswertung ---------- */
@@ -486,7 +499,7 @@
     return entryValueForOp(opForNextValue());
   }
   function numberEntryValue(e){
-    return e==="" ? 0 : Number.parseFloat(e.replace(/\./g,"").replace(",","."));
+    return e==="" ? 0 : Number.parseFloat(e.replace(/\s/g,"").replace(",","."));
   }
   function isScalarTimeEntry(op){
     return mode==="time" && (op==="*"||op==="/") && entry!=="" && !entry.includes(":");
@@ -505,7 +518,7 @@
     }
     if(!Number.isFinite(v)) return "";
     var r=Math.round(v*1e6)/1e6;
-    return (""+r).replace(".",",");
+    return ""+r;
   }
   function precedence(op){ return (op==="*"||op==="/") ? 2 : 1; }
   function applyOp(values, op){
@@ -650,11 +663,8 @@
       el.current.textContent = isScalarTimeEntry(opForNextValue()) ? fmtNum(numberEntryValue(entry)) : (entry==="" ? "0:00" : fmtTimeEntry(entry));
     } else if(entry===""){
       el.current.textContent = "0";
-    } else if(entry.endsWith(",")){
-      // Komma sofort sichtbar machen
-      el.current.textContent = fmtNum(Number.parseFloat(entry.slice(0,-1).replace(",",".")||"0"))+",";
     } else {
-      el.current.textContent = fmtNum(Number.parseFloat(entry.replace(/\./g,"").replace(",",".")));
+      el.current.textContent = fmtNumEntry(entry);
     }
     el.current.classList.toggle("compact", el.current.textContent.length>12);
     el.current.classList.toggle("tiny", el.current.textContent.length>18);
@@ -712,9 +722,9 @@
       entry += d;
     } else {
       if(d==="." || d===","){
-        if(entry.includes(",")) return;
+        if(entry.includes(".")) return;
         if(entry==="") entry="0";
-        entry += ",";
+        entry += ".";
       } else {
         if(entry==="0") entry=d; else entry+=d;
       }
@@ -829,7 +839,7 @@
     el.pad.innerHTML="";
     var sep = mode==="time"
       ? {t:":",c:"colon",a:"sep"}
-      : {t:",",c:"colon",a:"sep"};
+      : {t:".",c:"colon",a:"sep"};
     var rows = [
       [{t:"AC",c:"clear",a:"allclear"}, {t:"C",c:"clear-soft",a:"clear"}, {t:"⌫",c:"fn",a:"back"}, {t:"÷",c:"op",a:"op",op:"/"}],
       [{t:"7",a:"d"}, {t:"8",a:"d"}, {t:"9",a:"d"}, {t:"×",c:"op",a:"op",op:"*"}],
@@ -858,7 +868,7 @@
           else if(k.a==="allclear") clearAll();
           else if(k.a==="clear") clearEntry();
           else if(k.a==="sep") {
-            if(mode==="num") pressDigit(",");
+            if(mode==="num") pressDigit(".");
             else pressColonTime();
           }
         });
@@ -912,7 +922,7 @@
     else if(k==="Backspace"){backspace();}
     else if(k==="Escape"){clearAll();}
     else if(k==="Delete"){clearEntry();}
-    else if((k===","||k===".")&&mode==="num"){pressDigit(",");}
+    else if((k===","||k===".")&&mode==="num"){pressDigit(".");}
   });
 
   // Gespeicherten Zustand laden.
