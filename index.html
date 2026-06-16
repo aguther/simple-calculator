@@ -409,9 +409,10 @@
     var neg = total<0; total=Math.abs(Math.round(total));
     var h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
     var str;
-    if(s===0 && h>0) str = h+":"+pad2(m);
-    else if(h>0)     str = h+":"+pad2(m)+":"+pad2(s);
-    else             str = m+":"+pad2(s);
+    // Zeitwerte in der App immer als H:MM bzw. H:MM:SS darstellen.
+    // Dadurch wird z. B. 25 Minuten konsistent als 0:25 und nicht als 25:00 angezeigt.
+    if(s===0) str = h+":"+pad2(m);
+    else      str = h+":"+pad2(m)+":"+pad2(s);
     return (neg?"−":"")+str;
   }
 
