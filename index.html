@@ -282,7 +282,12 @@
     display:flex;align-items:center;justify-content:space-between;gap:16px;
     border-top:1px solid var(--line);border-bottom:1px solid var(--line);
   }
-  .sound-label{font-size:14px;font-weight:600;color:var(--txt);}
+  .layout-setting{
+    width:100%;padding:10px 0;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;
+    border-bottom:1px solid var(--line);
+  }
+  .setting-label{font-size:14px;font-weight:600;color:var(--txt);}
   .sound-switch{
     position:relative;width:46px;height:28px;flex:0 0 auto;
   }
@@ -302,6 +307,23 @@
   .sound-switch input:checked + .sound-slider{background:var(--amber-soft);}
   .sound-switch input:checked + .sound-slider::before{
     transform:translateX(18px);background:var(--amber);
+  }
+  .side-options{
+    display:grid;grid-template-columns:repeat(2,1fr);gap:4px;
+    padding:4px;border-radius:12px;background:#2b2b31;
+    flex:0 0 118px;
+  }
+  .side-options input{
+    position:absolute;opacity:0;width:1px;height:1px;
+  }
+  .side-options label{
+    height:28px;border-radius:9px;
+    display:flex;align-items:center;justify-content:center;
+    color:var(--muted);font-size:13px;font-weight:700;
+    cursor:pointer;
+  }
+  .side-options input:checked + label{
+    background:var(--key);color:var(--txt);
   }
   .about-close{
     margin-top:8px;border:0;border-radius:12px;cursor:pointer;
@@ -324,12 +346,23 @@
       column-gap:12px;
       padding:calc(var(--safe-t) + 12px) 12px max(var(--safe-b), 12px);
     }
+    .app.history-right{
+      grid-template-columns:minmax(360px, 480px) minmax(300px, .95fr);
+      grid-template-areas:
+        "mode mode"
+        "display tape"
+        "paren tape"
+        "pad tape";
+    }
     .modebar{
       grid-area:mode;
       max-width:480px;
       width:100%;
       justify-self:end;
       margin-bottom:0;
+    }
+    .app.history-right .modebar{
+      justify-self:start;
     }
     .tape-wrap{
       grid-area:tape;
@@ -370,7 +403,7 @@
 </style>
 </head>
 <body>
-<div class="app">
+<div class="app" id="app">
   <div class="modebar" id="modebar">
     <button data-mode="time" class="modetab active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Zeit</button>
     <button data-mode="num" class="modetab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>Rechner</button>
@@ -413,12 +446,21 @@
     <p class="about-sub">Rechnen mit Zeiten und Zahlen.</p>
     <p class="about-version">__COMMIT__</p>
     <label class="sound-setting" for="soundToggle">
-      <span class="sound-label">Tastenklicks</span>
+      <span class="setting-label">Tastenklicks</span>
       <span class="sound-switch">
         <input type="checkbox" id="soundToggle" />
         <span class="sound-slider"></span>
       </span>
     </label>
+    <div class="layout-setting">
+      <span class="setting-label">Verlauf</span>
+      <div class="side-options" id="historySideOptions" role="radiogroup" aria-label="Position des Verlaufs im Querformat">
+        <input type="radio" id="historyLeft" name="historySide" value="left" />
+        <label for="historyLeft">Links</label>
+        <input type="radio" id="historyRight" name="historySide" value="right" />
+        <label for="historyRight">Rechts</label>
+      </div>
+    </div>
     <button class="about-close" id="aboutClose">Schließen</button>
   </div>
 </div>

@@ -9,6 +9,7 @@
   var pendingOp = null;         // Operator, der auf den nächsten committeten Wert wartet
   var ready = false;
   var clickSoundEnabled = false;
+  var historySide = "left";
   var audioCtx = null;
 
   // Getrennter Zustand je Modus.
@@ -55,7 +56,7 @@
   }
   function persistSettings(){
     try{
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ clickSoundEnabled: clickSoundEnabled }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ clickSoundEnabled: clickSoundEnabled, historySide: historySide }));
     }catch(e){}
   }
   function loadSettings(){
@@ -64,10 +65,12 @@
       if(!raw) return;
       var data = JSON.parse(raw);
       clickSoundEnabled = !!(data && data.clickSoundEnabled);
+      if(data && (data.historySide==="left" || data.historySide==="right")) historySide = data.historySide;
     }catch(e){}
   }
 
   var el = {
+    app: document.getElementById("app"),
     tape: document.getElementById("tape"),
     sum: document.getElementById("sum"),
     sumMinutes: document.getElementById("sumMinutes"),
@@ -103,6 +106,11 @@
   function feedback(){
     haptic();
     playClick();
+  }
+  function applyHistorySide(){
+    el.app.classList.toggle("history-right", historySide==="right");
+    var sideInput = document.querySelector('input[name="historySide"][value="' + historySide + '"]');
+    if(sideInput) sideInput.checked = true;
   }
 
   function pressKeyVisual(button){
@@ -487,6 +495,7 @@
   /* ---------- About-Dialog ---------- */
   var overlay = document.getElementById("aboutOverlay");
   var soundToggle = document.getElementById("soundToggle");
+  var historySideOptions = document.getElementById("historySideOptions");
   document.getElementById("infoBtn").addEventListener("click",function(){
     feedback(); overlay.style.display="flex";
   });
@@ -498,6 +507,12 @@
     clickSoundEnabled = soundToggle.checked;
     persistSettings();
     if(clickSoundEnabled) playClick();
+  });
+  historySideOptions.addEventListener("change",function(e){
+    if(e.target.name!=="historySide") return;
+    historySide = e.target.value==="right" ? "right" : "left";
+    applyHistorySide();
+    persistSettings();
   });
 
   /* ---------- Hardware-Tastatur ---------- */
@@ -525,6 +540,7 @@
   loadSettings();
   restoreState(mode);
   soundToggle.checked = clickSoundEnabled;
+  applyHistorySide();
   Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(btn){
     btn.classList.toggle("active", btn.dataset.mode===mode);
   });
