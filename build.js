@@ -16,6 +16,10 @@ for (const file of assets) {
   fs.copyFileSync(path.join(__dirname, file), path.join(dist, file));
 }
 
+const srcDist = path.join(dist, "src");
+if (!fs.existsSync(srcDist)) fs.mkdirSync(srcDist);
+fs.copyFileSync(path.join(__dirname, "src", "calculator-core.js"), path.join(srcDist, "calculator-core.js"));
+
 const htmlPath = path.join(dist, "index.html");
 fs.writeFileSync(htmlPath, fs.readFileSync(htmlPath, "utf8").replaceAll("__COMMIT__", version));
 
