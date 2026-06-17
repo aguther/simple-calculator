@@ -92,15 +92,21 @@
       var now = audioCtx.currentTime;
       var osc = audioCtx.createOscillator();
       var gain = audioCtx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(820, now);
+      var filter = audioCtx.createBiquadFilter();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(360, now);
+      osc.frequency.exponentialRampToValueAtTime(190, now + 0.026);
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(900, now);
+      filter.Q.setValueAtTime(0.7, now);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.035, now + 0.004);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
-      osc.connect(gain);
+      gain.gain.exponentialRampToValueAtTime(0.026, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
+      osc.connect(filter);
+      filter.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start(now);
-      osc.stop(now + 0.05);
+      osc.stop(now + 0.035);
     }catch(e){}
   }
   function feedback(){
