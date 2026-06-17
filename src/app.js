@@ -8,6 +8,8 @@
   var lastEntryWasResult = false;
   var pendingOp = null;         // Operator, der auf den nächsten committeten Wert wartet
   var ready = false;
+  var clickSoundEnabled = false;
+  var audioCtx = null;
 
   // Getrennter Zustand je Modus.
   var saved = {
@@ -32,6 +34,7 @@
   }
 
   var STORE_KEY = "zeitrechner-state-v4";
+  var SETTINGS_KEY = "zeitrechner-settings-v1";
   function persist(){
     captureState();
     try{
@@ -50,6 +53,19 @@
       if(data && (data.mode==="time"||data.mode==="num")) mode = data.mode;
     }catch(e){}
   }
+  function persistSettings(){
+    try{
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ clickSoundEnabled: clickSoundEnabled }));
+    }catch(e){}
+  }
+  function loadSettings(){
+    try{
+      var raw = localStorage.getItem(SETTINGS_KEY);
+      if(!raw) return;
+      var data = JSON.parse(raw);
+      clickSoundEnabled = !!(data && data.clickSoundEnabled);
+    }catch(e){}
+  }
 
   var el = {
     tape: document.getElementById("tape"),
@@ -63,6 +79,31 @@
   };
 
   function haptic(){ if(navigator.vibrate) try{navigator.vibrate(8);}catch(e){} }
+  function playClick(){
+    if(!clickSoundEnabled) return;
+    var AudioContext = window.AudioContext || window.webkitAudioContext;
+    if(!AudioContext) return;
+    try{
+      if(!audioCtx) audioCtx = new AudioContext();
+      if(audioCtx.state==="suspended") audioCtx.resume().catch(function(){});
+      var now = audioCtx.currentTime;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(820, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.035, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now);
+      osc.stop(now + 0.05);
+    }catch(e){}
+  }
+  function feedback(){
+    haptic();
+    playClick();
+  }
 
   function pressKeyVisual(button){
     button.classList.remove("key-pop");
@@ -378,7 +419,7 @@
         b.addEventListener("pointercancel",function(){ releaseKeyVisual(b); });
         b.addEventListener("pointerleave",function(){ releaseKeyVisual(b); });
         b.addEventListener("click",function(){
-          haptic();
+          feedback();
           if(k.a==="d") pressDigit(k.t);
           else if(k.a==="op") pressOp(k.op);
           else if(k.a==="eq") pressEquals();
@@ -410,21 +451,27 @@
   }
   el.modebar.addEventListener("click",function(e){
     var b=e.target.closest(".modetab"); if(!b) return;
-    haptic(); setMode(b.dataset.mode);
+    feedback(); setMode(b.dataset.mode);
   });
-  el.undo.addEventListener("click",function(){haptic();undo();});
-  document.getElementById("openParen").addEventListener("click",function(){haptic();pressOpenParen();});
-  document.getElementById("closeParen").addEventListener("click",function(){haptic();pressCloseParen();});
+  el.undo.addEventListener("click",function(){feedback();undo();});
+  document.getElementById("openParen").addEventListener("click",function(){feedback();pressOpenParen();});
+  document.getElementById("closeParen").addEventListener("click",function(){feedback();pressCloseParen();});
 
   /* ---------- About-Dialog ---------- */
   var overlay = document.getElementById("aboutOverlay");
+  var soundToggle = document.getElementById("soundToggle");
   document.getElementById("infoBtn").addEventListener("click",function(){
-    haptic(); overlay.style.display="flex";
+    feedback(); overlay.style.display="flex";
   });
   document.getElementById("aboutClose").addEventListener("click",function(){
-    haptic(); overlay.style.display="none";
+    feedback(); overlay.style.display="none";
   });
   overlay.addEventListener("click",function(e){ if(e.target===this) this.style.display="none"; });
+  soundToggle.addEventListener("change",function(){
+    clickSoundEnabled = soundToggle.checked;
+    persistSettings();
+    if(clickSoundEnabled) playClick();
+  });
 
   /* ---------- Hardware-Tastatur ---------- */
   window.addEventListener("keydown",function(e){
@@ -448,7 +495,9 @@
 
   // Gespeicherten Zustand laden.
   loadPersisted();
+  loadSettings();
   restoreState(mode);
+  soundToggle.checked = clickSoundEnabled;
   Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(btn){
     btn.classList.toggle("active", btn.dataset.mode===mode);
   });
