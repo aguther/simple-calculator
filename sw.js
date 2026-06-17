@@ -1,7 +1,8 @@
-const CACHE = "zeitrechner-v7";
+const CACHE = "zeitrechner-v8";
 const ASSETS = [
   "./index.html",
   "./src/calculator-core.js",
+  "./src/app.js",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png"
