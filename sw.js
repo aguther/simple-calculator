@@ -1,4 +1,4 @@
-const CACHE = "zeitrechner-v11";
+const CACHE = "zeitrechner-v12";
 const ASSETS = [
   "./index.html",
   "./src/calculator-core.js",
@@ -25,14 +25,15 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      if (cached && !cached.redirected) return cached;
-      return fetch(e.request).then((res) => {
-        if (res.ok && !res.redirected) {
-          caches.open(CACHE).then((c) => c.put(e.request, res.clone()));
-        }
-        return res;
-      }).catch(() => cached);
-    })
+    fetch(e.request).then((res) => {
+      if (res.ok && !res.redirected) {
+        caches.open(CACHE).then((c) => c.put(e.request, res.clone()));
+      }
+      return res;
+    }).catch(() =>
+      caches.match(e.request).then((cached) =>
+        cached && !cached.redirected ? cached : Response.error()
+      )
+    )
   );
 });
