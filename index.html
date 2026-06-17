@@ -309,6 +309,64 @@
     font-size:15px;font-weight:600;padding:10px 28px;
   }
   .about-close:active{background:var(--key-press);}
+
+  @media (min-width:760px) and (min-height:520px){
+    .app{
+      max-width:1120px;
+      display:grid;
+      grid-template-columns:minmax(300px, .95fr) minmax(360px, 480px);
+      grid-template-rows:auto minmax(0, 1fr) auto auto;
+      grid-template-areas:
+        "mode mode"
+        "tape display"
+        "tape paren"
+        "tape pad";
+      column-gap:12px;
+      padding:calc(var(--safe-t) + 12px) 12px max(var(--safe-b), 12px);
+    }
+    .modebar{
+      grid-area:mode;
+      max-width:480px;
+      width:100%;
+      justify-self:end;
+      margin-bottom:0;
+    }
+    .tape-wrap{
+      grid-area:tape;
+      min-height:0;
+      margin-bottom:0;
+    }
+    .display{
+      grid-area:display;
+      min-height:0;
+      align-self:end;
+      padding:0 12px 10px;
+    }
+    .display .current{
+      font-size:clamp(46px,6.8vw,72px);
+    }
+    .display .current.compact{
+      font-size:clamp(36px,5.2vw,54px);
+    }
+    .display .current.tiny{
+      font-size:clamp(26px,3.9vw,38px);
+    }
+    .parenbar{
+      grid-area:paren;
+      margin-bottom:7px;
+    }
+    .pad{
+      grid-area:pad;
+      padding-bottom:0;
+    }
+    .pad button{
+      height:clamp(54px,8.2vh,76px);
+      font-size:clamp(22px,3.2vw,28px);
+    }
+    .pad .colon{
+      font-size:clamp(22px,3vw,26px);
+    }
+  }
 </style>
 </head>
 <body>
