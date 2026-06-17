@@ -440,7 +440,10 @@
     else if(k==="Backspace"){backspace();}
     else if(k==="Escape"){clearAll();}
     else if(k==="Delete"){clearEntry();}
-    else if((k===","||k===".")&&mode==="num"){pressDigit(".");}
+    else if(k===","||k==="."){
+      if(mode==="num") pressDigit(".");
+      else pressColonTime();
+    }
   });
 
   // Gespeicherten Zustand laden.
