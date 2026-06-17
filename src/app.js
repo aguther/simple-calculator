@@ -84,9 +84,9 @@
   /* ---------- Zeit-Helfer ----------
      Ohne ":" im entry: Auto-Modus — letzte 2 Ziffern = Minuten, Rest = Stunden (H:MM).
      Mit ":" im entry: Explizit-Modus — Felder werden links nach rechts eingegeben.
-       Einzelne Ziffer in Min/Sek = Zehnerstelle (1 → 10, nicht 01).
+       Einzelne Ziffer in Min/Sek wird als Einerstelle interpretiert (1 → 01).
        Leerfeld = 0. Bis zu 2 Doppelpunkte erlaubt (H:MM:SS).
-     Beispiele: "145"→1:45, "1:45"→1:45, "1:1"→1:10, "1::15"→1:00:15
+     Beispiele: "123"→1:23, "1:23"→1:23, "1:2"→1:02, "1::1"→1:00:01
   */
   var core = window.CalculatorCore;
   var pad2 = core.pad2;

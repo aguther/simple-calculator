@@ -24,12 +24,10 @@
     h = parseIntLoose(parts[0]||"0");
     mStr = parts[1]||"";
     m = Number.parseInt(mStr||"0",10);
-    if(mStr.length===1) m *= 10;
     s = 0;
     if(parts.length>=3){
       sStr = parts[2]||"";
       s = Number.parseInt(sStr||"0",10);
-      if(sStr.length===1) s *= 10;
     }
     return h*3600 + m*60 + s;
   }
@@ -44,10 +42,10 @@
     parts = e.split(":");
     h = groupInt(parseIntLoose(parts[0]||"0"));
     mStr = parts[1]||"";
-    if(mStr.length===0) mDisp="00"; else if(mStr.length===1) mDisp=mStr+"0"; else mDisp=mStr;
+    if(mStr.length===0) mDisp="00"; else if(mStr.length===1) mDisp="0"+mStr; else mDisp=mStr;
     if(parts.length===2) return h+":"+mDisp;
     sStr = parts[2]||"";
-    if(sStr.length===0) sDisp="00"; else if(sStr.length===1) sDisp=sStr+"0"; else sDisp=sStr;
+    if(sStr.length===0) sDisp="00"; else if(sStr.length===1) sDisp="0"+sStr; else sDisp=sStr;
     return h+":"+mDisp+":"+sDisp;
   }
   function fmtSeconds(total){
