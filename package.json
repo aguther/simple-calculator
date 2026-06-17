@@ -3,6 +3,8 @@
   "private": true,
   "scripts": {
     "build": "node build.js",
-    "test": "node test/calculator-core.test.js"
+    "test": "node test/calculator-core.test.js && node test/browser-smoke.test.js",
+    "test:core": "node test/calculator-core.test.js",
+    "test:ui": "node test/browser-smoke.test.js"
   }
 }
