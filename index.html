@@ -86,8 +86,14 @@
   .tape::-webkit-scrollbar{width:0;}
   .row{
     display:flex;align-items:center;gap:10px;
-    padding:7px 12px;border-radius:12px;margin:2px 4px;
+    position:relative;
+    padding:7px 12px;border-radius:12px;
+    margin:2px 4px 2px calc(4px + var(--depth, 0) * 14px);
     background:var(--panel-2);
+  }
+  .row.grouped::before{
+    content:"";position:absolute;left:-8px;top:-2px;bottom:-2px;width:2px;
+    border-radius:2px;background:rgba(232,148,58,.28);
   }
   .row .idx{
     width:24px;height:24px;border-radius:50%;flex:0 0 auto;
@@ -137,9 +143,16 @@
   .row.sum-divider .sum-eq{color:var(--amber);font-size:18px;font-weight:700;width:24px;text-align:center;flex:0 0 auto;}
   .row.sum-divider .val-main{color:var(--amber);}
   .row.sum-divider .val-minutes{color:rgba(245,243,239,.62);}
-  .row.paren-row{background:transparent;padding-top:3px;padding-bottom:3px;}
+  .row.paren-row{
+    background:rgba(232,148,58,.08);
+    padding-top:5px;padding-bottom:5px;
+    border:1px solid rgba(232,148,58,.12);
+  }
   .row.paren-row .idx{background:transparent;}
-  .row.paren-row .val-main{color:var(--muted);font-size:18px;}
+  .row.paren-row .val-main{color:var(--muted);font-size:15px;font-weight:700;letter-spacing:0;}
+  .row.group-close .op{color:var(--amber);font-weight:800;}
+  .row.group-close .val-main{color:var(--amber);font-size:18px;letter-spacing:.4px;}
+  .row.group-close .val-minutes{color:rgba(245,243,239,.62);}
 
   /* ---- Live display ---- */
   .display{

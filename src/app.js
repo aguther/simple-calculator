@@ -160,6 +160,10 @@
 
   /* ---------- Rendering ---------- */
   function valueLabel(v, unit){ return valueLabelCore(v, unit, mode); }
+  function setGroupDepth(row, depth){
+    row.style.setProperty("--depth", depth);
+    if(depth>0) row.classList.add("grouped");
+  }
   function appendValueLabel(parent, value, unit){
     var main=document.createElement("div");
     main.className="val-main";
@@ -177,31 +181,45 @@
     // Tape
     el.tape.innerHTML="";
     if(steps.length!==0){
-      var stepNum=0, firstInGroup=true, afterSum=false;
-      steps.forEach(function(st){
+      var stepNum=0, firstInGroup=true, afterSum=false, depth=0, groupStack=[];
+      steps.forEach(function(st, index){
         var row=document.createElement("div");
         if(st.type==="sum"){
           var val=document.createElement("div"); val.className="val"; appendValueLabel(val, st.value, st.unit);
           row.className="row sum-divider";
+          setGroupDepth(row, depth);
           var eq=document.createElement("div"); eq.className="sum-eq"; eq.textContent="=";
           var sp=document.createElement("div"); sp.style.flex="1";
           row.appendChild(eq); row.appendChild(sp); row.appendChild(val);
           firstInGroup=true;
           afterSum=true;
         } else if(st.type==="paren"){
-          row.className="row paren-row";
+          var isOpen = st.value==="(";
+          if(!isOpen) depth = Math.max(0, depth-1);
+          row.className="row paren-row " + (isOpen ? "group-open" : "group-close");
+          setGroupDepth(row, depth);
           var idxParen=document.createElement("div"); idxParen.className="idx"; idxParen.textContent="";
           var opParen=document.createElement("div"); opParen.className="op"; opParen.textContent=st.op?opSymbol(st.op):"";
           var valParen=document.createElement("div"); valParen.className="val";
-          var mainParen=document.createElement("div"); mainParen.className="val-main"; mainParen.textContent=st.value;
-          valParen.appendChild(mainParen);
+          if(isOpen){
+            var mainParen=document.createElement("div"); mainParen.className="val-main"; mainParen.textContent="Gruppe";
+            valParen.appendChild(mainParen);
+            groupStack.push({start:index});
+          } else {
+            opParen.textContent = "=";
+            var group = groupStack.pop();
+            var groupValue = group ? evaluateStepsCore(steps.slice(group.start, index+1)) : Number.NaN;
+            appendValueLabel(valParen, groupValue);
+          }
           row.appendChild(idxParen); row.appendChild(opParen); row.appendChild(valParen);
-          firstInGroup = st.value==="(";
+          if(isOpen) depth++;
+          firstInGroup = isOpen;
           afterSum=false;
         } else {
           var val=document.createElement("div"); val.className="val"; appendValueLabel(val, st.value, st.unit);
           stepNum++;
           row.className="row";
+          setGroupDepth(row, depth);
           var idx=document.createElement("div"); idx.className="idx"; idx.textContent=stepNum;
           var op=document.createElement("div"); op.className="op"; op.textContent=st.op&&(!firstInGroup||afterSum)?opSymbol(st.op):"";
           row.appendChild(idx); row.appendChild(op); row.appendChild(val);
