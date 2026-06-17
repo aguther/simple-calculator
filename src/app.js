@@ -157,6 +157,15 @@
   function evaluate(){
     return evaluateStepsCore(steps);
   }
+  function evaluateGroupSteps(groupSteps){
+    var localSteps = groupSteps.map(function(st, i){
+      if(i===0 && st.type==="paren" && st.value==="(" && st.op){
+        return {type:"paren", value:"("};
+      }
+      return st;
+    });
+    return evaluateStepsCore(localSteps);
+  }
 
   /* ---------- Rendering ---------- */
   function valueLabel(v, unit){ return valueLabelCore(v, unit, mode); }
@@ -208,7 +217,7 @@
           } else {
             opParen.textContent = "=";
             var group = groupStack.pop();
-            var groupValue = group ? evaluateStepsCore(steps.slice(group.start, index+1)) : Number.NaN;
+            var groupValue = group ? evaluateGroupSteps(steps.slice(group.start, index+1)) : Number.NaN;
             appendValueLabel(valParen, groupValue);
           }
           row.appendChild(idxParen); row.appendChild(opParen); row.appendChild(valParen);
