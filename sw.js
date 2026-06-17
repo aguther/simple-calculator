@@ -1,4 +1,4 @@
-const CACHE = "zeitrechner-v14";
+const CACHE = "zeitrechner-v15";
 const ASSETS = [
   "./index.html",
   "./src/calculator-core.js",

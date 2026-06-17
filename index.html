@@ -66,11 +66,14 @@
   .info-btn{
     width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
     background:#2b2b31;color:var(--muted);
-    font-size:15px;font-style:italic;font-family:Georgia,serif;
     display:flex;align-items:center;justify-content:center;
     flex:0 0 auto;margin-left:2px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 0 rgba(0,0,0,.34);
   }
-  .info-btn:active{background:var(--key-press);}
+  .info-btn svg,
+  .undo svg,
+  .pad button svg{width:18px;height:18px;display:block;}
+  .info-btn:active{background:var(--key-press);transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.3);}
 
   /* ---- Tape (Verlauf) ---- */
   .tape-wrap{
@@ -134,11 +137,12 @@
   .total .sum-minutes{order:1;color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;line-height:14px;flex:0 0 var(--minutes-col);text-align:right;white-space:nowrap;}
   .undo{
     width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
-    background:#2b2b31;color:var(--muted);font-size:15px;
+    background:#2b2b31;color:var(--muted);
     display:flex;align-items:center;justify-content:center;
     order:2;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 0 rgba(0,0,0,.34);
   }
-  .undo:active{background:var(--key-press);}
+  .undo:active{background:var(--key-press);transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.3);}
   .row.sum-divider{background:var(--amber-soft);border:1px solid rgba(232,148,58,.22);}
   .row.sum-divider .sum-eq{color:var(--amber);font-size:18px;font-weight:700;width:24px;text-align:center;flex:0 0 auto;}
   .row.sum-divider .val-main{color:var(--amber);}
@@ -200,6 +204,7 @@
     color:var(--txt);background:var(--key);
     display:flex;align-items:center;justify-content:center;
     position:relative;overflow:hidden;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.28), 0 4px 0 rgba(0,0,0,.32);
     transition:transform .06s ease-out, background .10s ease-out, filter .10s ease-out, box-shadow .10s ease-out;
     will-change:transform,filter;
   }
@@ -212,9 +217,9 @@
   }
   .pad button:active,
   .pad button.is-pressed{
-    transform:translateY(2px) scale(.90);
+    transform:translateY(3px) scale(.92);
     filter:brightness(1.28) saturate(1.08);
-    box-shadow:inset 0 3px 8px rgba(0,0,0,.34), 0 0 0 1px rgba(255,255,255,.08);
+    box-shadow:inset 0 4px 9px rgba(0,0,0,.38), 0 1px 0 rgba(0,0,0,.36), 0 0 0 1px rgba(255,255,255,.08);
   }
   .pad button.is-pressed::after{
     opacity:1;
@@ -227,7 +232,7 @@
     animation:key-flash .24s ease-out;
   }
   @keyframes key-pop{
-    0%{transform:translateY(2px) scale(.90);}
+    0%{transform:translateY(3px) scale(.92);}
     48%{transform:translateY(-1px) scale(1.065);}
     72%{transform:scale(.985);}
     100%{transform:scale(1);}
@@ -368,6 +373,12 @@
       grid-area:tape;
       min-height:0;
       margin-bottom:0;
+      background:#131316;
+      border:1px solid rgba(255,255,255,.05);
+      box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 14px 36px rgba(0,0,0,.22);
+    }
+    .tape-wrap .total{
+      background:rgba(12,12,14,.24);
     }
     .display{
       grid-area:display;
@@ -407,7 +418,7 @@
   <div class="modebar" id="modebar">
     <button data-mode="time" class="modetab active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Zeit</button>
     <button data-mode="num" class="modetab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>Rechner</button>
-    <button class="info-btn" id="infoBtn" aria-label="Über die App">i</button>
+    <button class="info-btn" id="infoBtn" aria-label="Über die App"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="12" y1="7" x2="12.01" y2="7"/></svg></button>
   </div>
 
   <div class="tape-wrap">
@@ -417,7 +428,7 @@
       <div class="right">
         <div class="total-value">
           <span class="sum-minutes" id="sumMinutes"></span>
-          <button class="undo" id="undo" aria-label="Letzten Schritt zurück">↺</button>
+          <button class="undo" id="undo" aria-label="Letzten Schritt zurück"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 1 1-4.2 10.3"/></svg></button>
           <span class="sum" id="sum">0</span>
         </div>
       </div>

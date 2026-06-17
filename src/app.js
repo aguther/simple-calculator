@@ -441,7 +441,7 @@
       ? {t:":",c:"colon",a:"sep"}
       : {t:".",c:"colon",a:"sep"};
     var rows = [
-      [{t:"AC",c:"clear",a:"allclear"}, {t:"C",c:"clear-soft",a:"clear"}, {t:"⌫",c:"fn",a:"back"}, {t:"÷",c:"op",a:"op",op:"/"}],
+      [{t:"AC",c:"clear",a:"allclear"}, {t:"C",c:"clear-soft",a:"clear"}, {t:"",html:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 4H8l-6 8 6 8h13z"/><path d="m18 9-6 6"/><path d="m12 9 6 6"/></svg>',c:"fn",a:"back"}, {t:"÷",c:"op",a:"op",op:"/"}],
       [{t:"7",a:"d"}, {t:"8",a:"d"}, {t:"9",a:"d"}, {t:"×",c:"op",a:"op",op:"*"}],
       [{t:"4",a:"d"}, {t:"5",a:"d"}, {t:"6",a:"d"}, {t:"−",c:"op",a:"op",op:"-"}],
       [{t:"1",a:"d"}, {t:"2",a:"d"}, {t:"3",a:"d"}, {t:"+",c:"op",a:"op",op:"+"}],
@@ -451,7 +451,8 @@
     rows.forEach(function(r){
       r.forEach(function(k){
         var b=document.createElement("button");
-        b.textContent=k.t;
+        if(k.html) b.innerHTML=k.html;
+        else b.textContent=k.t;
         if(k.c) b.className=k.c;
         if(k.wide) b.classList.add("wide");
         if(k.op) b.dataset.op=k.op;
