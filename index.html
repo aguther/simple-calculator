@@ -9,6 +9,8 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <title>Zeitrechner</title>
 <link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <style>
   :root{
@@ -41,7 +43,7 @@
   /* position:fixed ist auf iOS Safari zuverlässiger als vh/dvh-Höhen-Kaskaden */
   .app{
     position:fixed;top:0;right:0;bottom:0;left:0;
-    max-width:480px;margin:0 auto;
+    width:100%;max-width:480px;margin:0 auto;
     overflow:hidden;
     display:flex;flex-direction:column;
     padding:calc(var(--safe-t) + 6px) 12px 0;
@@ -90,7 +92,7 @@
   .row{
     display:flex;align-items:center;gap:10px;
     position:relative;
-    padding:7px 12px;border-radius:12px;
+    padding:6px 12px;border-radius:12px;
     margin:2px 4px 2px calc(4px + var(--depth, 0) * 14px);
     background:var(--panel-2);
   }
@@ -114,11 +116,12 @@
   .row .val-main{
     order:2;
     flex:0 0 var(--time-col);text-align:right;
-    font-size:20px;font-weight:600;letter-spacing:.5px;font-variant-numeric:tabular-nums;
+    font-size:18px;font-weight:600;letter-spacing:.3px;font-variant-numeric:tabular-nums;
+    white-space:nowrap;
   }
   .row .val-minutes{
     order:1;
-    color:var(--muted);font-size:12px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;
+    color:var(--muted);font-size:11px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;
     flex:0 0 var(--minutes-col);text-align:right;white-space:nowrap;
   }
   .tape-empty{
@@ -131,10 +134,12 @@
     padding:10px 16px;
   }
   .total .lbl{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:2px;}
-  .total .right{display:flex;align-items:center;}
-  .total-value{display:flex;align-items:center;justify-content:flex-end;gap:8px;}
-  .total .sum{order:3;color:var(--amber);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;flex:0 0 var(--time-col);text-align:right;}
-  .total .sum-minutes{order:1;color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;line-height:14px;flex:0 0 var(--minutes-col);text-align:right;white-space:nowrap;}
+  .total .right{display:flex;align-items:center;justify-content:flex-end;flex:1 1 auto;min-width:0;margin-left:12px;}
+  .total-value{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;}
+  .total .sum{order:3;color:var(--amber);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;flex:0 0 auto;min-width:max-content;text-align:right;white-space:nowrap;}
+  .total .sum.compact{font-size:19px;}
+  .total .sum.tiny{font-size:16px;}
+  .total .sum-minutes{order:1;color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;line-height:14px;flex:0 1 var(--minutes-col);min-width:0;text-align:right;white-space:nowrap;}
   .undo{
     width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
     background:#2b2b31;color:var(--muted);
@@ -144,7 +149,7 @@
   }
   .undo:active{background:var(--key-press);transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.3);}
   .row.sum-divider{background:var(--amber-soft);border:1px solid rgba(232,148,58,.22);}
-  .row.sum-divider .sum-eq{color:var(--amber);font-size:18px;font-weight:700;width:24px;text-align:center;flex:0 0 auto;}
+  .row.sum-divider .sum-eq{color:var(--amber);font-size:17px;font-weight:700;width:24px;text-align:center;flex:0 0 auto;}
   .row.sum-divider .val-main{color:var(--amber);}
   .row.sum-divider .val-minutes{color:rgba(245,243,239,.62);}
   .row.paren-row{
@@ -155,7 +160,7 @@
   .row.paren-row .idx{background:transparent;}
   .row.paren-row .val-main{color:var(--muted);font-size:15px;font-weight:700;letter-spacing:0;}
   .row.group-close .op{color:var(--amber);font-weight:800;}
-  .row.group-close .val-main{color:var(--amber);font-size:18px;letter-spacing:.4px;}
+  .row.group-close .val-main{color:var(--amber);font-size:17px;letter-spacing:.3px;}
   .row.group-close .val-minutes{color:rgba(245,243,239,.62);}
 
   /* ---- Live display ---- */
@@ -195,6 +200,12 @@
   /* PWA/Standalone: native App-Optik – Keypad bewusst näher an den unteren Rand */
   @media (display-mode: standalone){
     .pad{ padding-bottom:8px; }
+  }
+  @media (max-width:480px){
+    .app{
+      max-width:none;
+      margin:0;
+    }
   }
   .pad button{
     border:0;border-radius:16px;cursor:pointer;
@@ -379,6 +390,16 @@
     }
     .tape-wrap .total{
       background:rgba(12,12,14,.24);
+    }
+    .total .right{
+      flex:0 0 auto;
+      margin-left:0;
+    }
+    .total .sum{
+      flex:0 0 var(--time-col);
+    }
+    .total .sum-minutes{
+      flex:0 0 var(--minutes-col);
     }
     .display{
       grid-area:display;
