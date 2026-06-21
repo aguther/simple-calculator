@@ -257,6 +257,8 @@
     var totalValue = evaluate();
     el.sum.textContent = valueLabel(totalValue);
     el.sumMinutes.textContent = mode==="time" ? fmtMinutes(totalValue) : "";
+    el.sum.classList.toggle("compact", el.sum.textContent.length>7);
+    el.sum.classList.toggle("tiny", el.sum.textContent.length>10);
     // Pending-Operator / aktuelle Eingabe
     el.pending.textContent = pendingOp ? opSymbol(pendingOp) : "";
     if(mode==="time"){
