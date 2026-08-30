@@ -1,27 +1,89 @@
-const { execSync } = require("node:child_process");
+const { execFileSync } = require("node:child_process");
+const crypto = require("node:crypto");
 const fs = require("node:fs");
 const path = require("node:path");
 
-let sha = process.env.CF_PAGES_COMMIT_SHA || "";
-if (!sha) {
-  try { sha = execSync("git rev-parse HEAD").toString().trim(); } catch (e) {}
-}
-const version = sha ? sha.slice(0, 7) : "dev";
+const ROOT = __dirname;
+const DIST = path.join(ROOT, "dist");
+const ASSETS_DIR = path.join(DIST, "assets");
 
-const dist = path.join(__dirname, "dist");
-if (!fs.existsSync(dist)) fs.mkdirSync(dist);
-
-const assets = ["index.html", "sw.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
-for (const file of assets) {
-  fs.copyFileSync(path.join(__dirname, file), path.join(dist, file));
+function read(relativePath) {
+  return fs.readFileSync(path.join(ROOT, relativePath));
 }
 
-const srcDist = path.join(dist, "src");
-if (!fs.existsSync(srcDist)) fs.mkdirSync(srcDist);
-fs.copyFileSync(path.join(__dirname, "src", "calculator-core.js"), path.join(srcDist, "calculator-core.js"));
-fs.copyFileSync(path.join(__dirname, "src", "app.js"), path.join(srcDist, "app.js"));
+function shortHash(content) {
+  return crypto.createHash("sha256").update(content).digest("hex").slice(0, 12);
+}
 
-const htmlPath = path.join(dist, "index.html");
-fs.writeFileSync(htmlPath, fs.readFileSync(htmlPath, "utf8").replaceAll("__COMMIT__", version));
+function commitVersion() {
+  const fromCloudflare = process.env.CF_PAGES_COMMIT_SHA || process.env.CLOUDFLARE_COMMIT_SHA || "";
+  if (fromCloudflare) return fromCloudflare.slice(0, 7);
+  try {
+    return execFileSync("git", ["rev-parse", "--short=7", "HEAD"], { cwd: ROOT, encoding: "utf8" }).trim();
+  } catch (error) {
+    return "dev";
+  }
+}
 
-console.log("Build version:", version);
+const sourceAssets = [
+  { source: "src/app.css", name: "app", extension: ".css" },
+  { source: "src/calculator-core.js", name: "calculator-core", extension: ".js" },
+  { source: "src/state-store.js", name: "state-store", extension: ".js" },
+  { source: "src/app.js", name: "app", extension: ".js" }
+].map((asset) => ({ ...asset, content: read(asset.source) }));
+
+const buildFingerprint = shortHash(Buffer.concat([
+  read("index.html"),
+  read("manifest.webmanifest"),
+  read("sw.js"),
+  read("_headers"),
+  ...sourceAssets.map((asset) => asset.content)
+]));
+const displayVersion = commitVersion() + "." + buildFingerprint.slice(0, 7);
+
+fs.rmSync(DIST, { recursive: true, force: true });
+fs.mkdirSync(ASSETS_DIR, { recursive: true });
+
+const builtAssets = new Map();
+for (const asset of sourceAssets) {
+  const filename = asset.name + "." + shortHash(asset.content) + asset.extension;
+  fs.writeFileSync(path.join(ASSETS_DIR, filename), asset.content);
+  builtAssets.set(asset.source, "assets/" + filename);
+}
+
+let html = read("index.html").toString("utf8");
+for (const [source, built] of builtAssets) {
+  html = html.replaceAll(source, built);
+}
+html = html.replaceAll("__COMMIT__", displayVersion);
+fs.writeFileSync(path.join(DIST, "index.html"), html);
+
+for (const filename of ["manifest.webmanifest", "icon-192.png", "icon-512.png", "_headers"]) {
+  fs.copyFileSync(path.join(ROOT, filename), path.join(DIST, filename));
+}
+
+const precacheAssets = [
+  "./index.html",
+  "./manifest.webmanifest",
+  "./icon-192.png",
+  "./icon-512.png",
+  ...Array.from(builtAssets.values(), (asset) => "./" + asset)
+];
+let serviceWorker = read("sw.js").toString("utf8");
+serviceWorker = serviceWorker.replaceAll("__BUILD_VERSION__", buildFingerprint);
+serviceWorker = serviceWorker.replace(
+  /\/\*__PRECACHE_ASSETS__\*\/\s*\[[\s\S]*?\];/,
+  "/*__PRECACHE_ASSETS__*/ " + JSON.stringify(precacheAssets, null, 2) + ";"
+);
+fs.writeFileSync(path.join(DIST, "sw.js"), serviceWorker);
+
+const assetManifest = {
+  version: buildFingerprint,
+  displayVersion,
+  assets: Object.fromEntries(builtAssets),
+  precache: precacheAssets
+};
+fs.writeFileSync(path.join(DIST, "asset-manifest.json"), JSON.stringify(assetManifest, null, 2) + "\n");
+
+console.log("Build version:", displayVersion);
+console.log("Build fingerprint:", buildFingerprint);

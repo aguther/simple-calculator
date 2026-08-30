@@ -1,125 +1,124 @@
 (function(){
   "use strict";
 
-  /* ---------- State ---------- */
-  var mode = "time";            // "time" | "num"
-  var entry = "";               // rohe Eingabe als String
-  var steps = [];               // {op:'+'|'-'|'*'|'/'|null, value:Number} | {type:'sum', value:Number}
-  var lastEntryWasResult = false;
-  var pendingOp = null;         // Operator, der auf den nächsten committeten Wert wartet
-  var ready = false;
-  var clickSoundEnabled = false;
-  var historySide = "left";
-  var audioCtx = null;
+  var core=window.CalculatorCore;
+  var stateStore=window.CalculatorStateStore;
+  var loaded=stateStore.load(localStorage);
+  var settings=stateStore.loadSettings(localStorage);
 
-  // Getrennter Zustand je Modus.
-  var saved = {
-    time: { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null },
-    num:  { entry:"", steps:[], lastEntryWasResult:false, pendingOp:null }
+  var mode=loaded.mode;
+  var saved=loaded.saved;
+  var entry="";
+  var steps=[];
+  var lastEntryWasResult=false;
+  var pendingOp=null;
+  var error=null;
+  var clickSoundEnabled=settings.clickSoundEnabled;
+  var historySide=settings.historySide;
+  var audioCtx=null;
+
+  var el={
+    app:document.getElementById("app"),
+    tape:document.getElementById("tape"),
+    sum:document.getElementById("sum"),
+    sumMinutes:document.getElementById("sumMinutes"),
+    pending:document.getElementById("pending"),
+    current:document.getElementById("current"),
+    pad:document.getElementById("pad"),
+    undo:document.getElementById("undo"),
+    modebar:document.getElementById("modebar"),
+    openParen:document.getElementById("openParen"),
+    closeParen:document.getElementById("closeParen"),
+    infoBtn:document.getElementById("infoBtn"),
+    aboutDialog:document.getElementById("aboutDialog"),
+    aboutClose:document.getElementById("aboutClose"),
+    soundToggle:document.getElementById("soundToggle"),
+    historySideOptions:document.getElementById("historySideOptions")
   };
 
   function captureState(){
-    saved[mode] = {
-      entry: entry,
-      steps: steps.slice(),
-      lastEntryWasResult: lastEntryWasResult,
-      pendingOp: pendingOp
+    saved[mode]={
+      entry:entry,
+      steps:steps.slice(),
+      lastEntryWasResult:lastEntryWasResult,
+      pendingOp:pendingOp,
+      error:error
     };
   }
-  function restoreState(m){
-    var s = saved[m];
-    entry = s.entry;
-    steps = s.steps.slice();
-    lastEntryWasResult = s.lastEntryWasResult;
-    pendingOp = s.pendingOp;
+
+  function restoreState(nextMode){
+    var state=saved[nextMode] || stateStore.emptyModeState();
+    entry=state.entry;
+    steps=state.steps.slice();
+    lastEntryWasResult=state.lastEntryWasResult;
+    pendingOp=state.pendingOp;
+    error=state.error || null;
   }
 
-  var STORE_KEY = "zeitrechner-state-v4";
-  var SETTINGS_KEY = "zeitrechner-settings-v1";
   function persist(){
     captureState();
     try{
-      localStorage.setItem(STORE_KEY, JSON.stringify({ mode: mode, saved: saved }));
+      var clean=stateStore.save(localStorage,{version:5,mode:mode,saved:saved});
+      saved=clean.saved;
     }catch(e){}
   }
-  function loadPersisted(){
-    try{
-      var raw = localStorage.getItem(STORE_KEY);
-      if(!raw) return;
-      var data = JSON.parse(raw);
-      if(data && data.saved){
-        if(data.saved.time) saved.time = data.saved.time;
-        if(data.saved.num)  saved.num  = data.saved.num;
-      }
-      if(data && (data.mode==="time"||data.mode==="num")) mode = data.mode;
-    }catch(e){}
-  }
+
   function persistSettings(){
     try{
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ clickSoundEnabled: clickSoundEnabled, historySide: historySide }));
-    }catch(e){}
-  }
-  function loadSettings(){
-    try{
-      var raw = localStorage.getItem(SETTINGS_KEY);
-      if(!raw) return;
-      var data = JSON.parse(raw);
-      clickSoundEnabled = !!(data && data.clickSoundEnabled);
-      if(data && (data.historySide==="left" || data.historySide==="right")) historySide = data.historySide;
+      settings=stateStore.saveSettings(localStorage,{clickSoundEnabled:clickSoundEnabled,historySide:historySide});
     }catch(e){}
   }
 
-  var el = {
-    app: document.getElementById("app"),
-    tape: document.getElementById("tape"),
-    sum: document.getElementById("sum"),
-    sumMinutes: document.getElementById("sumMinutes"),
-    pending: document.getElementById("pending"),
-    current: document.getElementById("current"),
-    pad: document.getElementById("pad"),
-    undo: document.getElementById("undo"),
-    modebar: document.getElementById("modebar")
-  };
+  function completeChange(){
+    render();
+    persist();
+  }
 
-  function haptic(){ if(navigator.vibrate) try{navigator.vibrate(8);}catch(e){} }
+  function haptic(){
+    if(navigator.vibrate) try{ navigator.vibrate(8); }catch(e){}
+  }
+
   function playClick(){
     if(!clickSoundEnabled) return;
-    var AudioContext = window.AudioContext || window.webkitAudioContext;
+    var AudioContext=window.AudioContext || window.webkitAudioContext;
     if(!AudioContext) return;
     try{
-      if(!audioCtx) audioCtx = new AudioContext();
+      if(!audioCtx) audioCtx=new AudioContext();
       if(audioCtx.state==="suspended") audioCtx.resume().catch(function(){});
-      var now = audioCtx.currentTime;
-      var osc = audioCtx.createOscillator();
-      var gain = audioCtx.createGain();
-      var filter = audioCtx.createBiquadFilter();
-      osc.type = "square";
-      osc.frequency.setValueAtTime(360, now);
-      osc.frequency.exponentialRampToValueAtTime(190, now + 0.026);
-      filter.type = "lowpass";
-      filter.frequency.setValueAtTime(900, now);
-      filter.Q.setValueAtTime(0.7, now);
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.026, now + 0.003);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
+      var now=audioCtx.currentTime;
+      var osc=audioCtx.createOscillator();
+      var gain=audioCtx.createGain();
+      var filter=audioCtx.createBiquadFilter();
+      osc.type="square";
+      osc.frequency.setValueAtTime(360,now);
+      osc.frequency.exponentialRampToValueAtTime(190,now+0.026);
+      filter.type="lowpass";
+      filter.frequency.setValueAtTime(900,now);
+      filter.Q.setValueAtTime(0.7,now);
+      gain.gain.setValueAtTime(0.0001,now);
+      gain.gain.exponentialRampToValueAtTime(0.026,now+0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001,now+0.032);
       osc.connect(filter);
       filter.connect(gain);
       gain.connect(audioCtx.destination);
       osc.start(now);
-      osc.stop(now + 0.035);
+      osc.stop(now+0.035);
     }catch(e){}
   }
+
   function feedback(){
     haptic();
     playClick();
   }
+
   function applyHistorySide(){
-    el.app.classList.toggle("history-right", historySide==="right");
-    var sideInput = document.querySelector('input[name="historySide"][value="' + historySide + '"]');
-    if(sideInput) sideInput.checked = true;
+    el.app.classList.toggle("history-right",historySide==="right");
+    var sideInput=document.querySelector('input[name="historySide"][value="'+historySide+'"]');
+    if(sideInput) sideInput.checked=true;
   }
 
   function pressKeyVisual(button){
+    if(button.disabled) return;
     button.classList.remove("key-pop");
     button.classList.add("is-pressed");
   }
@@ -128,439 +127,549 @@
     if(!button.classList.contains("is-pressed")) return;
     button.classList.remove("is-pressed");
     button.classList.remove("key-pop");
-    // Reflow erzwingen, damit wiederholtes schnelles Tippen die Animation neu startet.
     void button.offsetWidth;
     button.classList.add("key-pop");
-    window.setTimeout(function(){
-      button.classList.remove("key-pop");
-    }, 260);
+    window.setTimeout(function(){ button.classList.remove("key-pop"); },260);
   }
 
-  /* ---------- Zeit-Helfer ----------
-     Ohne ":" im entry: Auto-Modus — letzte 2 Ziffern = Minuten, Rest = Stunden (H:MM).
-     Mit ":" im entry: Explizit-Modus — Felder werden links nach rechts eingegeben.
-       Einzelne Ziffer in Min/Sek wird als Einerstelle interpretiert (1 → 01).
-       Leerfeld = 0. Bis zu 2 Doppelpunkte erlaubt (H:MM:SS).
-     Beispiele: "123"→1:23, "1:23"→1:23, "1:2"→1:02, "1::1"→1:00:01
-  */
-  var core = window.CalculatorCore;
-  var pad2 = core.pad2;
-  var entryToSeconds = core.entryToSeconds;
-  var fmtTimeEntry = core.fmtTimeEntry;
-  var fmtSeconds = core.fmtSeconds;
-  var fmtMinutes = core.fmtMinutes;
-  var fmtNum = core.fmtNum;
-  var fmtNumEntry = core.fmtNumEntry;
-  var numberEntryValue = core.numberEntryValue;
-  var valueToEntryCore = core.valueToEntry;
-  var expressionStepsCore = core.expressionSteps;
-  var evaluateStepsCore = core.evaluateSteps;
-  var opSymbol = core.opSymbol;
-  var valueLabelCore = core.valueLabel;
+  function expressionSteps(){ return core.expressionSteps(steps); }
+  function evaluate(){ return core.evaluateSteps(steps); }
+  function valueLabel(value,unit){ return core.valueLabel(value,unit,mode); }
 
-  function expressionSteps(){
-    return expressionStepsCore(steps);
-  }
   function isScalarTimeEntry(op){
-    return mode==="time" && (op==="*"||op==="/") && entry!=="" && !entry.includes(":");
-  }
-  function entryValueForOp(op){
-    if(mode==="time") return isScalarTimeEntry(op) ? numberEntryValue(entry) : entryToSeconds(entry);
-    return numberEntryValue(entry);
-  }
-  function evaluate(){
-    return evaluateStepsCore(steps);
-  }
-  function evaluateGroupSteps(groupSteps){
-    var localSteps = groupSteps.map(function(st, i){
-      if(i===0 && st.type==="paren" && st.value==="(" && st.op){
-        return {type:"paren", value:"("};
-      }
-      return st;
-    });
-    return evaluateStepsCore(localSteps);
+    return mode==="time" && (op==="*" || op==="/") && entry!=="" && !entry.includes(":");
   }
 
-  /* ---------- Rendering ---------- */
-  function valueLabel(v, unit){ return valueLabelCore(v, unit, mode); }
-  function setGroupDepth(row, depth){
-    row.style.setProperty("--depth", depth);
+  function entryValueForOp(op){
+    if(mode==="time") return isScalarTimeEntry(op) ? core.numberEntryValue(entry) : core.entryToSeconds(entry);
+    return core.numberEntryValue(entry);
+  }
+
+  function evaluateGroupSteps(groupSteps){
+    var localSteps=groupSteps.map(function(step,index){
+      if(index===0 && step.type==="paren" && step.value==="(" && step.op) return {type:"paren",value:"("};
+      return step;
+    });
+    return core.evaluateSteps(localSteps);
+  }
+
+  function setGroupDepth(row,depth){
+    row.dataset.depth=String(Math.min(depth,8));
     if(depth>0) row.classList.add("grouped");
   }
-  function appendValueLabel(parent, value, unit){
+
+  function appendValueLabel(parent,value,unit){
     var main=document.createElement("div");
     main.className="val-main";
-    main.textContent=valueLabel(value, unit);
+    main.textContent=valueLabel(value,unit);
     parent.appendChild(main);
     if(mode==="time" && unit!=="scalar"){
       var minutes=document.createElement("div");
       minutes.className="val-minutes";
-      minutes.textContent=fmtMinutes(value);
+      minutes.textContent=core.fmtMinutes(value);
       parent.appendChild(minutes);
     }
   }
 
-  function render(){
-    // Tape
-    el.tape.innerHTML="";
-    if(steps.length!==0){
-      var stepNum=0, firstInGroup=true, afterSum=false, depth=0, groupStack=[];
-      steps.forEach(function(st, index){
-        var row=document.createElement("div");
-        if(st.type==="sum"){
-          var val=document.createElement("div"); val.className="val"; appendValueLabel(val, st.value, st.unit);
-          row.className="row sum-divider";
-          setGroupDepth(row, depth);
-          var eq=document.createElement("div"); eq.className="sum-eq"; eq.textContent="=";
-          var sp=document.createElement("div"); sp.style.flex="1";
-          row.appendChild(eq); row.appendChild(sp); row.appendChild(val);
-          firstInGroup=true;
-          afterSum=true;
-        } else if(st.type==="paren"){
-          var isOpen = st.value==="(";
-          if(!isOpen) depth = Math.max(0, depth-1);
-          row.className="row paren-row " + (isOpen ? "group-open" : "group-close");
-          setGroupDepth(row, depth);
-          var idxParen=document.createElement("div"); idxParen.className="idx"; idxParen.textContent="";
-          var opParen=document.createElement("div"); opParen.className="op"; opParen.textContent=st.op?opSymbol(st.op):"";
-          var valParen=document.createElement("div"); valParen.className="val";
-          if(isOpen){
-            var mainParen=document.createElement("div"); mainParen.className="val-main"; mainParen.textContent="Gruppe";
-            valParen.appendChild(mainParen);
-            groupStack.push({start:index});
-          } else {
-            opParen.textContent = "=";
-            var group = groupStack.pop();
-            var groupValue = group ? evaluateGroupSteps(steps.slice(group.start, index+1)) : Number.NaN;
-            appendValueLabel(valParen, groupValue);
-          }
-          row.appendChild(idxParen); row.appendChild(opParen); row.appendChild(valParen);
-          if(isOpen) depth++;
-          firstInGroup = isOpen;
-          afterSum=false;
-        } else {
-          var val=document.createElement("div"); val.className="val"; appendValueLabel(val, st.value, st.unit);
-          stepNum++;
-          row.className="row";
-          setGroupDepth(row, depth);
-          var idx=document.createElement("div"); idx.className="idx"; idx.textContent=stepNum;
-          var op=document.createElement("div"); op.className="op"; op.textContent=st.op&&(!firstInGroup||afterSum)?opSymbol(st.op):"";
-          row.appendChild(idx); row.appendChild(op); row.appendChild(val);
-          firstInGroup=false;
-          afterSum=false;
+  function renderTape(){
+    el.tape.replaceChildren();
+    if(steps.length===0) return;
+    var stepNum=0;
+    var firstInGroup=true;
+    var afterSum=false;
+    var depth=0;
+    var groupStack=[];
+    steps.forEach(function(step,index){
+      var row=document.createElement("div");
+      if(step.type==="sum"){
+        var sumValue=document.createElement("div");
+        sumValue.className="val";
+        appendValueLabel(sumValue,step.value,step.unit);
+        row.className="row sum-divider";
+        setGroupDepth(row,depth);
+        var equals=document.createElement("div");
+        equals.className="sum-eq";
+        equals.textContent="=";
+        var spacer=document.createElement("div");
+        spacer.className="row-spacer";
+        row.append(equals,spacer,sumValue);
+        firstInGroup=true;
+        afterSum=true;
+      }else if(step.type==="paren"){
+        var isOpen=step.value==="(";
+        if(!isOpen) depth=Math.max(0,depth-1);
+        row.className="row paren-row "+(isOpen ? "group-open" : "group-close");
+        setGroupDepth(row,depth);
+        var parenIndex=document.createElement("div");
+        parenIndex.className="idx";
+        var parenOp=document.createElement("div");
+        parenOp.className="op";
+        parenOp.textContent=step.op ? core.opSymbol(step.op) : "";
+        var parenValue=document.createElement("div");
+        parenValue.className="val";
+        if(isOpen){
+          var groupLabel=document.createElement("div");
+          groupLabel.className="val-main";
+          groupLabel.textContent="Gruppe";
+          parenValue.appendChild(groupLabel);
+          groupStack.push({start:index});
+        }else{
+          parenOp.textContent="=";
+          var group=groupStack.pop();
+          appendValueLabel(parenValue,group ? evaluateGroupSteps(steps.slice(group.start,index+1)) : Number.NaN);
         }
-        el.tape.appendChild(row);
-      });
-      el.tape.scrollTop = el.tape.scrollHeight;
-    }
-    // Summe
-    var totalValue = evaluate();
-    el.sum.textContent = valueLabel(totalValue);
-    el.sumMinutes.textContent = mode==="time" ? fmtMinutes(totalValue) : "";
-    el.sum.classList.toggle("compact", el.sum.textContent.length>7);
-    el.sum.classList.toggle("tiny", el.sum.textContent.length>10);
-    // Pending-Operator / aktuelle Eingabe
-    el.pending.textContent = pendingOp ? opSymbol(pendingOp) : "";
-    if(mode==="time"){
-      el.current.textContent = isScalarTimeEntry(opForNextValue()) ? fmtNum(numberEntryValue(entry)) : (entry==="" ? "0:00" : fmtTimeEntry(entry));
-    } else if(entry===""){
-      el.current.textContent = "0";
-    } else {
-      el.current.textContent = fmtNumEntry(entry);
-    }
-    el.current.classList.toggle("compact", el.current.textContent.length>12);
-    el.current.classList.toggle("tiny", el.current.textContent.length>18);
-    // armed operator highlight
-    Array.prototype.forEach.call(document.querySelectorAll(".pad .op"),function(b){
-      b.classList.toggle("armed", b.dataset.op===pendingOp);
+        row.append(parenIndex,parenOp,parenValue);
+        if(isOpen) depth++;
+        firstInGroup=isOpen;
+        afterSum=false;
+      }else{
+        var value=document.createElement("div");
+        value.className="val";
+        appendValueLabel(value,step.value,step.unit);
+        stepNum++;
+        row.className="row";
+        setGroupDepth(row,depth);
+        var number=document.createElement("div");
+        number.className="idx";
+        number.textContent=stepNum;
+        var operator=document.createElement("div");
+        operator.className="op";
+        operator.textContent=step.op && (!firstInGroup || afterSum) ? core.opSymbol(step.op) : "";
+        row.append(number,operator,value);
+        firstInGroup=false;
+        afterSum=false;
+      }
+      el.tape.appendChild(row);
     });
-    // Doppelpunkt leuchtet wenn expliziter Modus aktiv (entry enthält ":")
-    var colonBtn = el.pad.querySelector(".colon");
-    if(colonBtn && mode==="time") colonBtn.classList.toggle("armed", entry.includes(":"));
-    if(ready) persist();
+    el.tape.scrollTop=el.tape.scrollHeight;
   }
 
-  /* ---------- Eingabelogik ---------- */
-  function lastExprStep(){
-    var rel=expressionSteps();
-    return rel.length ? rel[rel.length-1] : null;
+  function currentText(){
+    if(error) return error;
+    if(mode==="time"){
+      return isScalarTimeEntry(opForNextValue()) ? core.fmtNum(core.numberEntryValue(entry)) : (entry==="" ? "0:00" : core.fmtTimeEntry(entry));
+    }
+    return entry==="" ? "0" : core.fmtNumEntry(entry);
   }
-  function isValueStep(st){ return st && st.type!=="sum" && st.type!=="paren"; }
+
+  function canCloseParen(){
+    if(error || lastEntryWasResult || openParenCount()<=0) return false;
+    if(entry!=="") return true;
+    var last=lastExprStep();
+    return isValueStep(last) || !!(last && last.type==="paren" && last.value===")");
+  }
+
+  function canEqual(){
+    if(error || lastEntryWasResult || openParenCount()!==0) return false;
+    if(entry!=="") return true;
+    var last=lastExprStep();
+    return isValueStep(last) || !!(last && last.type==="paren" && last.value===")");
+  }
+
+  function render(){
+    renderTape();
+    var totalValue=evaluate();
+    el.sum.textContent=valueLabel(totalValue);
+    el.sumMinutes.textContent=mode==="time" ? core.fmtMinutes(totalValue) : "";
+    el.sum.classList.toggle("compact",el.sum.textContent.length>7);
+    el.sum.classList.toggle("tiny",el.sum.textContent.length>10);
+    el.pending.textContent=error ? "" : (pendingOp ? core.opSymbol(pendingOp) : "");
+    el.current.textContent=currentText();
+    el.current.classList.toggle("compact",!error && el.current.textContent.length>12);
+    el.current.classList.toggle("tiny",!error && el.current.textContent.length>18);
+    el.current.classList.toggle("error",!!error);
+    el.current.setAttribute("aria-label",error ? "Fehler: "+error : "Aktuelle Eingabe: "+el.current.textContent);
+    Array.prototype.forEach.call(el.pad.querySelectorAll(".op"),function(button){
+      button.classList.toggle("armed",!error && button.dataset.op===pendingOp);
+    });
+    var colonButton=el.pad.querySelector(".colon");
+    if(colonButton && mode==="time") colonButton.classList.toggle("armed",!error && entry.includes(":"));
+    var equalsButton=el.pad.querySelector('[data-action="eq"]');
+    if(equalsButton) equalsButton.disabled=!canEqual();
+    el.undo.disabled=!error && entry==="" && !pendingOp && steps.length===0;
+    el.closeParen.disabled=!canCloseParen();
+    el.openParen.disabled=!!error;
+  }
+
+  function lastExprStep(){
+    var relevant=expressionSteps();
+    return relevant.length ? relevant[relevant.length-1] : null;
+  }
+
+  function isValueStep(step){ return step && step.type!=="sum" && step.type!=="paren"; }
+
   function canStartValue(){
     var last=lastExprStep();
     return !last || pendingOp || (last.type==="paren" && last.value==="(");
   }
+
   function openParenCount(){
-    return expressionSteps().reduce(function(acc, st){
-      if(st.type==="paren" && st.value==="(") return acc+1;
-      if(st.type==="paren" && st.value===")") return acc-1;
-      return acc;
+    return expressionSteps().reduce(function(count,step){
+      if(step.type==="paren" && step.value==="(") return count+1;
+      if(step.type==="paren" && step.value===")") return count-1;
+      return count;
     },0);
   }
+
   function opForNextValue(){
     var last=lastExprStep();
     if(!last) return pendingOp || null;
     if(last.type==="paren" && last.value==="(") return null;
     return pendingOp || "+";
   }
+
   function commitEntry(valueOverride){
     var op=opForNextValue();
     var scalar=isScalarTimeEntry(op);
-    var v = valueOverride===undefined ? entryValueForOp(op) : valueOverride;
-    steps.push({op:op, value:v, unit:scalar?"scalar":undefined});
+    var value=valueOverride===undefined ? entryValueForOp(op) : valueOverride;
+    steps.push({op:op,value:value,unit:scalar ? "scalar" : undefined});
     entry="";
     pendingOp=null;
   }
 
-  function pressDigit(d){
-    if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
-    if(!canStartValue()) return;
+  function resetForNewExpression(){
+    entry="";
+    steps=[];
+    pendingOp=null;
+    lastEntryWasResult=false;
+    error=null;
+  }
+
+  function pressDigit(digit){
+    if(error || lastEntryWasResult) resetForNewExpression();
+    if(!canStartValue()) return false;
     if(mode==="time"){
-      var parts = entry.split(":");
-      var colons = parts.length-1;
-      // Im aktuellen Min-/Sek-Feld max 2 Ziffern; im Auto-Modus max 9 Gesamt
-      if(colons>=1 && parts[colons].length>=2) return;
-      if(colons===0 && entry.length>=9) return;
-      entry += d;
-    } else {
-      if(d==="." || d===","){
-        if(entry.includes(".")) return;
-        if(entry==="") entry="0";
-        entry += ".";
-      } else {
-        if(entry==="0") entry=d; else entry+=d;
-      }
+      var unsigned=entry.charAt(0)==="-" ? entry.slice(1) : entry;
+      var parts=unsigned.split(":");
+      var colons=parts.length-1;
+      if(colons>=1 && parts[colons].length>=2) return false;
+      if(colons===0 && unsigned.length>=9) return false;
+      entry+=digit;
+    }else if(digit==="." || digit===","){
+      if(entry.includes(".")) return false;
+      if(entry==="") entry="0";
+      entry+=".";
+    }else{
+      if(entry==="0") entry=digit;
+      else entry+=digit;
     }
-    render();
+    completeChange();
+    return true;
   }
 
   function pressOp(op){
+    if(error) return false;
     if(lastEntryWasResult){
-      entry = "";
-      lastEntryWasResult = false;
-      pendingOp = op;
-      render();
-      return;
+      entry="";
+      lastEntryWasResult=false;
+      pendingOp=op;
+      completeChange();
+      return true;
     }
-    if(entry!==""){
-      commitEntry();
-    }
+    if(entry!=="") commitEntry();
     var last=lastExprStep();
-    if(!last){
-      commitEntry(0);
-    } else if(last.type==="paren" && last.value==="("){
+    if(!last) commitEntry(0);
+    else if(last.type==="paren" && last.value==="("){
       if(op==="-") commitEntry(0);
-      else return;
-    } else if(!isValueStep(last) && !(last.type==="paren" && last.value===")")){
-      return;
+      else return false;
+    }else if(!isValueStep(last) && !(last.type==="paren" && last.value===")")){
+      return false;
     }
-    pendingOp = op;
-    render();
+    pendingOp=op;
+    completeChange();
+    return true;
   }
 
   function pressEquals(){
-    if(lastEntryWasResult) return;
+    if(!canEqual()) return false;
     if(entry!=="") commitEntry();
-    if(expressionSteps().length===0) return;
-    if(openParenCount()!==0) return;
-    var last=lastExprStep();
-    if(!isValueStep(last) && !(last && last.type==="paren" && last.value===")")) return;
-    var res = evaluate();
-    if(!Number.isFinite(res)) return;
-    steps.push({type:"sum", value:res});
-    entry = valueToEntryCore(res, mode);
-    pendingOp = null;
-    lastEntryWasResult = true;
-    render();
+    var result=evaluate();
+    if(!Number.isFinite(result)){
+      error="Nicht definiert";
+      entry="";
+      pendingOp=null;
+      lastEntryWasResult=false;
+      completeChange();
+      return true;
+    }
+    steps.push({type:"sum",value:result});
+    entry=core.valueToEntry(result,mode);
+    pendingOp=null;
+    lastEntryWasResult=true;
+    completeChange();
+    return true;
   }
 
   function pressColonTime(){
-    if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
-    if(!canStartValue()) return;
-    var colons = (entry.match(/:/g)||[]).length;
-    if(colons>=2) return; // max. 2 Doppelpunkte (H:MM:SS)
-    entry += ":";
-    render();
+    if(error || lastEntryWasResult) resetForNewExpression();
+    if(!canStartValue()) return false;
+    if((entry.match(/:/g) || []).length>=2) return false;
+    entry+=":";
+    completeChange();
+    return true;
   }
+
   function pressOpenParen(){
-    if(lastEntryWasResult){ entry=""; pendingOp=null; lastEntryWasResult=false; }
+    if(error) return false;
+    if(lastEntryWasResult) resetForNewExpression();
     if(entry!=="") commitEntry();
     var last=lastExprStep();
     var op=null;
-    if(last && (isValueStep(last) || (last.type==="paren" && last.value===")"))){
-      op=pendingOp || "*";
-    } else {
-      op=pendingOp;
-    }
-    steps.push({type:"paren", value:"(", op:op});
+    if(last && (isValueStep(last) || (last.type==="paren" && last.value===")"))) op=pendingOp || "*";
+    else op=pendingOp;
+    steps.push({type:"paren",value:"(",op:op});
     pendingOp=null;
-    render();
+    completeChange();
+    return true;
   }
+
   function pressCloseParen(){
-    if(lastEntryWasResult) return;
+    if(!canCloseParen()) return false;
     if(entry!=="") commitEntry();
-    if(openParenCount()<=0) return;
-    var last=lastExprStep();
-    if(!isValueStep(last) && !(last && last.type==="paren" && last.value===")")) return;
-    steps.push({type:"paren", value:")"});
+    steps.push({type:"paren",value:")"});
     pendingOp=null;
-    render();
+    completeChange();
+    return true;
   }
 
   function backspace(){
-    if(entry!==""){ entry=entry.slice(0,-1); }
-    else if(pendingOp){ pendingOp=null; }
-    else if(steps.length>0){ steps.pop(); }
-    render();
+    if(error){ resetForNewExpression(); completeChange(); return true; }
+    if(entry!=="") entry=entry.slice(0,-1);
+    else if(pendingOp) pendingOp=null;
+    else if(steps.length>0) steps.pop();
+    else return false;
+    completeChange();
+    return true;
   }
+
   function clearAll(){
-    entry=""; steps=[]; pendingOp=null; lastEntryWasResult=false;
-    render();
+    resetForNewExpression();
+    completeChange();
+    return true;
   }
+
   function clearEntry(){
-    if(lastEntryWasResult){ clearAll(); return; }
-    entry=""; render();
+    if(error || lastEntryWasResult) return clearAll();
+    if(entry==="") return false;
+    entry="";
+    completeChange();
+    return true;
   }
+
   function undo(){
+    if(error){ resetForNewExpression(); completeChange(); return true; }
     if(lastEntryWasResult){
-      lastEntryWasResult = false;
-      entry = "";
-      pendingOp = null;
+      lastEntryWasResult=false;
+      entry="";
+      pendingOp=null;
       if(steps.length>0 && steps[steps.length-1].type==="sum") steps.pop();
-      render();
-      return;
+      completeChange();
+      return true;
     }
-    if(entry!==""){ entry=""; render(); return; }
-    if(pendingOp){ pendingOp=null; render(); return; }
-    if(steps.length>0){ steps.pop(); pendingOp=null; }
-    render();
+    if(entry!=="") entry="";
+    else if(pendingOp) pendingOp=null;
+    else if(steps.length>0){ steps.pop(); pendingOp=null; }
+    else return false;
+    completeChange();
+    return true;
   }
 
-  /* ---------- Keypad-Aufbau ---------- */
-  function buildPad(){
-    el.pad.innerHTML="";
-    var sep = mode==="time"
-      ? {t:":",c:"colon",a:"sep"}
-      : {t:".",c:"colon",a:"sep"};
-    var rows = [
-      [{t:"AC",c:"clear",a:"allclear"}, {t:"C",c:"clear-soft",a:"clear"}, {t:"⌫",c:"fn",a:"back"}, {t:"÷",c:"op",a:"op",op:"/"}],
-      [{t:"7",a:"d"}, {t:"8",a:"d"}, {t:"9",a:"d"}, {t:"×",c:"op",a:"op",op:"*"}],
-      [{t:"4",a:"d"}, {t:"5",a:"d"}, {t:"6",a:"d"}, {t:"−",c:"op",a:"op",op:"-"}],
-      [{t:"1",a:"d"}, {t:"2",a:"d"}, {t:"3",a:"d"}, {t:"+",c:"op",a:"op",op:"+"}],
-      [{t:"0",a:"d",wide:true}, sep, {t:"=",c:"eq",a:"eq"}]
-    ];
+  var labels={
+    allclear:"Alles löschen",
+    clear:"Aktuelle Eingabe löschen",
+    back:"Letzte Stelle löschen",
+    eq:"Ergebnis",
+    sepTime:"Zeit-Doppelpunkt",
+    sepNum:"Dezimaltrennzeichen",
+    "+":"Addieren",
+    "-":"Subtrahieren",
+    "*":"Multiplizieren",
+    "/":"Dividieren"
+  };
 
-    rows.forEach(function(r){
-      r.forEach(function(k){
-        var b=document.createElement("button");
-        if(k.html) b.innerHTML=k.html;
-        else b.textContent=k.t;
-        if(k.c) b.className=k.c;
-        if(k.wide) b.classList.add("wide");
-        if(k.op) b.dataset.op=k.op;
-        b.addEventListener("pointerdown",function(){ pressKeyVisual(b); });
-        b.addEventListener("pointerup",function(){ releaseKeyVisual(b); });
-        b.addEventListener("pointercancel",function(){ releaseKeyVisual(b); });
-        b.addEventListener("pointerleave",function(){ releaseKeyVisual(b); });
-        b.addEventListener("click",function(){
+  function buildPad(){
+    el.pad.replaceChildren();
+    var separator=mode==="time" ? {t:":",c:"colon",a:"sep",label:labels.sepTime} : {t:".",c:"colon",a:"sep",label:labels.sepNum};
+    var rows=[
+      [{t:"AC",c:"clear",a:"allclear",label:labels.allclear},{t:"C",c:"clear-soft",a:"clear",label:labels.clear},{t:"⌫",c:"fn",a:"back",label:labels.back},{t:"÷",c:"op",a:"op",op:"/",label:labels["/"]}],
+      [{t:"7",a:"d"},{t:"8",a:"d"},{t:"9",a:"d"},{t:"×",c:"op",a:"op",op:"*",label:labels["*"]}],
+      [{t:"4",a:"d"},{t:"5",a:"d"},{t:"6",a:"d"},{t:"−",c:"op",a:"op",op:"-",label:labels["-"]}],
+      [{t:"1",a:"d"},{t:"2",a:"d"},{t:"3",a:"d"},{t:"+",c:"op",a:"op",op:"+",label:labels["+"]}],
+      [{t:"0",a:"d",wide:true},separator,{t:"=",c:"eq",a:"eq",label:labels.eq}]
+    ];
+    rows.forEach(function(row){
+      row.forEach(function(key){
+        var button=document.createElement("button");
+        button.type="button";
+        button.textContent=key.t;
+        button.dataset.action=key.a;
+        if(key.c) button.className=key.c;
+        if(key.wide) button.classList.add("wide");
+        if(key.op) button.dataset.op=key.op;
+        button.setAttribute("aria-label",key.label || key.t);
+        button.addEventListener("pointerdown",function(){ pressKeyVisual(button); });
+        button.addEventListener("pointerup",function(){ releaseKeyVisual(button); });
+        button.addEventListener("pointercancel",function(){ releaseKeyVisual(button); });
+        button.addEventListener("pointerleave",function(){ releaseKeyVisual(button); });
+        button.addEventListener("click",function(){
           feedback();
-          if(k.a==="d") pressDigit(k.t);
-          else if(k.a==="op") pressOp(k.op);
-          else if(k.a==="eq") pressEquals();
-          else if(k.a==="back") backspace();
-          else if(k.a==="allclear") clearAll();
-          else if(k.a==="clear") clearEntry();
-          else if(k.a==="sep") {
-            if(mode==="num") pressDigit(".");
-            else pressColonTime();
-          }
+          if(key.a==="d") pressDigit(key.t);
+          else if(key.a==="op") pressOp(key.op);
+          else if(key.a==="eq") pressEquals();
+          else if(key.a==="back") backspace();
+          else if(key.a==="allclear") clearAll();
+          else if(key.a==="clear") clearEntry();
+          else if(key.a==="sep") mode==="num" ? pressDigit(".") : pressColonTime();
         });
-        el.pad.appendChild(b);
+        el.pad.appendChild(button);
       });
     });
   }
 
-  /* ---------- Modus ---------- */
-  function setMode(m){
-    if(m===mode) return;
+  function setMode(nextMode){
+    if(nextMode===mode) return false;
     captureState();
-    mode=m;
-    restoreState(m);
+    mode=nextMode;
+    restoreState(mode);
     buildPad();
-    Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(btn){
-      btn.classList.toggle("active", btn.dataset.mode===m);
+    Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(button){
+      var active=button.dataset.mode===mode;
+      button.classList.toggle("active",active);
+      button.setAttribute("aria-pressed",String(active));
     });
-    render();
-    persist();
+    completeChange();
+    return true;
   }
-  el.modebar.addEventListener("click",function(e){
-    var b=e.target.closest(".modetab"); if(!b) return;
-    feedback(); setMode(b.dataset.mode);
-  });
-  el.undo.addEventListener("click",function(){feedback();undo();});
-  document.getElementById("openParen").addEventListener("click",function(){feedback();pressOpenParen();});
-  document.getElementById("closeParen").addEventListener("click",function(){feedback();pressCloseParen();});
 
-  /* ---------- About-Dialog ---------- */
-  var overlay = document.getElementById("aboutOverlay");
-  var soundToggle = document.getElementById("soundToggle");
-  var historySideOptions = document.getElementById("historySideOptions");
-  document.getElementById("infoBtn").addEventListener("click",function(){
-    feedback(); overlay.style.display="flex";
+  el.modebar.addEventListener("click",function(event){
+    var button=event.target.closest(".modetab");
+    if(!button) return;
+    feedback();
+    setMode(button.dataset.mode);
   });
-  document.getElementById("aboutClose").addEventListener("click",function(){
-    feedback(); overlay.style.display="none";
+  el.undo.addEventListener("click",function(){ feedback(); undo(); });
+  el.openParen.addEventListener("click",function(){ feedback(); pressOpenParen(); });
+  el.closeParen.addEventListener("click",function(){ feedback(); pressCloseParen(); });
+
+  el.infoBtn.addEventListener("click",function(){
+    feedback();
+    el.aboutDialog.showModal();
+    el.aboutClose.focus();
   });
-  overlay.addEventListener("click",function(e){ if(e.target===this) this.style.display="none"; });
-  soundToggle.addEventListener("change",function(){
-    clickSoundEnabled = soundToggle.checked;
+  el.aboutClose.addEventListener("click",function(){ feedback(); el.aboutDialog.close(); });
+  el.aboutDialog.addEventListener("close",function(){ el.infoBtn.focus(); });
+  el.aboutDialog.addEventListener("click",function(event){
+    if(event.target===el.aboutDialog) el.aboutDialog.close();
+  });
+  el.soundToggle.addEventListener("change",function(){
+    clickSoundEnabled=el.soundToggle.checked;
     persistSettings();
     if(clickSoundEnabled) playClick();
   });
-  historySideOptions.addEventListener("change",function(e){
-    if(e.target.name!=="historySide") return;
-    historySide = e.target.value==="right" ? "right" : "left";
+  el.historySideOptions.addEventListener("change",function(event){
+    if(event.target.name!=="historySide") return;
+    historySide=event.target.value==="right" ? "right" : "left";
     applyHistorySide();
     persistSettings();
   });
 
-  /* ---------- Hardware-Tastatur ---------- */
-  window.addEventListener("keydown",function(e){
-    var k=e.key;
-    if(k>="0"&&k<="9"){pressDigit(k);}
-    else if(k==="+"){pressOp("+");}
-    else if(k==="-"){pressOp("-");}
-    else if(k==="*"){pressOp("*");}
-    else if(k==="/"){e.preventDefault();pressOp("/");}
-    else if(k==="Enter"||k==="="){e.preventDefault();pressEquals();}
-    else if(k==="("){pressOpenParen();}
-    else if(k===")"){pressCloseParen();}
-    else if(k==="Backspace"){backspace();}
-    else if(k==="Escape"){clearAll();}
-    else if(k==="Delete"){clearEntry();}
-    else if(k===","||k==="."){
-      if(mode==="num") pressDigit(".");
-      else pressColonTime();
-    }
+  window.addEventListener("keydown",function(event){
+    if(el.aboutDialog.open || document.querySelector(".diagnostics-dialog[open]")) return;
+    var key=event.key;
+    if(key>="0" && key<="9") pressDigit(key);
+    else if(key==="+") pressOp("+");
+    else if(key==="-") pressOp("-");
+    else if(key==="*") pressOp("*");
+    else if(key==="/"){ event.preventDefault(); pressOp("/"); }
+    else if(key==="Enter" || key==="="){ event.preventDefault(); pressEquals(); }
+    else if(key==="(") pressOpenParen();
+    else if(key===")") pressCloseParen();
+    else if(key==="Backspace") backspace();
+    else if(key==="Escape") clearAll();
+    else if(key==="Delete") clearEntry();
+    else if(key==="," || key===".") mode==="num" ? pressDigit(".") : pressColonTime();
   });
 
-  // Gespeicherten Zustand laden.
-  loadPersisted();
-  loadSettings();
+  function createSafeProbe(className){
+    var probe=document.createElement("span");
+    probe.className="safe-probe "+className;
+    document.body.appendChild(probe);
+    return probe;
+  }
+
+  function setupDiagnostics(){
+    if(new URLSearchParams(location.search).get("diagnostics")!=="1") return;
+    var dialog=document.createElement("dialog");
+    dialog.className="diagnostics-dialog";
+    dialog.setAttribute("aria-labelledby","diagnosticsTitle");
+    dialog.innerHTML='<div class="diagnostics-card"><h2 class="diagnostics-title" id="diagnosticsTitle">Layout-Diagnose</h2><pre class="diagnostics-output"></pre><p class="diagnostics-status" aria-live="polite"></p><div class="diagnostics-actions"><button type="button" class="diagnostics-copy">JSON kopieren</button><button type="button" class="diagnostics-close">Schließen</button></div></div>';
+    document.body.appendChild(dialog);
+    var output=dialog.querySelector(".diagnostics-output");
+    var status=dialog.querySelector(".diagnostics-status");
+    var probes={top:createSafeProbe("safe-probe-top"),right:createSafeProbe("safe-probe-right"),bottom:createSafeProbe("safe-probe-bottom"),left:createSafeProbe("safe-probe-left")};
+
+    function serviceWorkerVersion(){
+      return new Promise(function(resolve){
+        var controller=navigator.serviceWorker && navigator.serviceWorker.controller;
+        if(!controller){ resolve(null); return; }
+        var channel=new MessageChannel();
+        var timeout=setTimeout(function(){ resolve(null); },1000);
+        channel.port1.onmessage=function(event){
+          clearTimeout(timeout);
+          resolve(event.data && event.data.version ? event.data.version : null);
+        };
+        controller.postMessage({type:"GET_BUILD_VERSION"},[channel.port2]);
+      });
+    }
+
+    async function report(){
+      var viewport=window.visualViewport;
+      var orientation=screen.orientation;
+      var swVersion=await serviceWorkerVersion();
+      return {
+        build:document.querySelector(".about-version").textContent.trim(),
+        displayMode:matchMedia("(display-mode: standalone)").matches || navigator.standalone===true ? "standalone" : "browser",
+        window:{innerWidth:innerWidth,innerHeight:innerHeight},
+        document:{clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight},
+        visualViewport:viewport ? {width:viewport.width,height:viewport.height,offsetTop:viewport.offsetTop,offsetLeft:viewport.offsetLeft,scale:viewport.scale} : null,
+        screen:{width:screen.width,height:screen.height,orientation:orientation ? orientation.type : "unbekannt"},
+        safeArea:{
+          top:getComputedStyle(probes.top).paddingTop,
+          right:getComputedStyle(probes.right).paddingRight,
+          bottom:getComputedStyle(probes.bottom).paddingBottom,
+          left:getComputedStyle(probes.left).paddingLeft
+        },
+        serviceWorker:{status:swVersion ? "aktiv" : "nicht aktiv",version:swVersion}
+      };
+    }
+
+    async function refresh(){ output.textContent=JSON.stringify(await report(),null,2); }
+    dialog.querySelector(".diagnostics-copy").addEventListener("click",function(){
+      navigator.clipboard.writeText(output.textContent).then(function(){ status.textContent="Diagnose kopiert."; },function(){ status.textContent="Kopieren nicht verfügbar."; });
+    });
+    dialog.querySelector(".diagnostics-close").addEventListener("click",function(){ dialog.close(); });
+    window.addEventListener("resize",refresh);
+    window.addEventListener("orientationchange",refresh);
+    if(window.visualViewport) window.visualViewport.addEventListener("resize",refresh);
+    if(navigator.serviceWorker) navigator.serviceWorker.addEventListener("controllerchange",refresh);
+    refresh();
+    dialog.showModal();
+    dialog.querySelector(".diagnostics-copy").focus();
+  }
+
   restoreState(mode);
-  soundToggle.checked = clickSoundEnabled;
+  el.soundToggle.checked=clickSoundEnabled;
   applyHistorySide();
-  Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(btn){
-    btn.classList.toggle("active", btn.dataset.mode===mode);
+  Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(button){
+    var active=button.dataset.mode===mode;
+    button.classList.toggle("active",active);
+    button.setAttribute("aria-pressed",String(active));
   });
   buildPad();
-  ready = true;
   render();
+  setupDiagnostics();
 
-  /* ---------- Service Worker ---------- */
   if("serviceWorker" in navigator){
-    window.addEventListener("load",function(){
-      navigator.serviceWorker.register("sw.js").catch(function(){});
-    });
+    window.addEventListener("load",function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
   }
 })();

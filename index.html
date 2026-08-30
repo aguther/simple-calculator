@@ -1,504 +1,95 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
-<meta name="theme-color" content="#0c0c0e" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<meta name="mobile-web-app-capable" content="yes" />
-<title>Zeitrechner</title>
-<link rel="manifest" href="manifest.webmanifest" />
-<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
-<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
-<link rel="apple-touch-icon" href="icon-192.png" />
-<style>
-  :root{
-    --bg:#0c0c0e;
-    --panel:#16161a;
-    --panel-2:#1d1d22;
-    --key:#222227;
-    --key-press:#2c2c33;
-    --line:#2a2a30;
-    --txt:#f5f3ef;
-    --muted:#7d7d86;
-    --amber:#e8943a;
-    --amber-soft:#3a2c18;
-    --red:#b84a3f;
-    --green:#5aa66a;
-    --radius:20px;
-    --minutes-col:92px;
-    --time-col:96px;
-    --safe-b:env(safe-area-inset-bottom,0px);
-    --safe-t:env(safe-area-inset-top,0px);
-  }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{height:100%;margin:0;overflow:hidden;
-    background:var(--bg);color:var(--txt);
-    font-family:"SF Pro Display",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif;
-    user-select:none;-webkit-user-select:none;
-    overscroll-behavior:none;
-  }
-  button{touch-action:manipulation;}
-  /* position:fixed ist auf iOS Safari zuverlässiger als vh/dvh-Höhen-Kaskaden */
-  .app{
-    position:fixed;top:0;right:0;bottom:0;left:0;
-    width:100%;max-width:480px;margin:0 auto;
-    overflow:hidden;
-    display:flex;flex-direction:column;
-    padding:calc(var(--safe-t) + 6px) 12px 0;
-  }
-
-  /* ---- Top bar: mode switch ---- */
-  .modebar{
-    display:flex;gap:6px;padding:5px;
-    background:var(--panel);border-radius:16px;
-    margin-bottom:8px;flex:0 0 auto;
-    align-items:center;
-  }
-  .modebar .modetab{
-    flex:1;border:0;background:transparent;color:var(--muted);
-    font-size:14px;font-weight:600;letter-spacing:.3px;
-    padding:9px 0;border-radius:12px;cursor:pointer;
-    transition:background .18s,color .18s;
-    font-family:inherit;
-    display:flex;align-items:center;justify-content:center;gap:6px;
-  }
-  .modebar .modetab.active{background:var(--key);color:var(--txt);}
-  .info-btn{
-    width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
-    background:#2b2b31;color:var(--muted);
-    display:flex;align-items:center;justify-content:center;
-    flex:0 0 auto;margin-left:2px;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 0 rgba(0,0,0,.34);
-  }
-  .info-btn svg,
-  .undo svg,
-  .pad button svg{width:18px;height:18px;display:block;}
-  .info-btn:active{background:var(--key-press);transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.3);}
-
-  /* ---- Tape (Verlauf) ---- */
-  .tape-wrap{
-    flex:1 1 auto;min-height:0;
-    background:var(--panel);border-radius:var(--radius);
-    display:flex;flex-direction:column;overflow:hidden;
-    margin-bottom:8px;
-  }
-  .tape{
-    flex:1 1 auto;overflow-y:auto;padding:8px 4px 2px;
-    -webkit-overflow-scrolling:touch;
-  }
-  .tape::-webkit-scrollbar{width:0;}
-  .row{
-    display:flex;align-items:center;gap:10px;
-    position:relative;
-    padding:6px 12px;border-radius:12px;
-    margin:2px 4px 2px calc(4px + var(--depth, 0) * 14px);
-    background:var(--panel-2);
-  }
-  .row.grouped::before{
-    content:"";position:absolute;left:-8px;top:-2px;bottom:-2px;width:2px;
-    border-radius:2px;background:rgba(232,148,58,.28);
-  }
-  .row .idx{
-    width:24px;height:24px;border-radius:50%;flex:0 0 auto;
-    background:#2b2b31;color:var(--muted);
-    display:flex;align-items:center;justify-content:center;
-    font-size:11px;font-weight:600;
-  }
-  .row .op{color:var(--amber);font-size:18px;font-weight:600;width:14px;text-align:center;flex:0 0 auto;}
-  .row .val{
-    flex:1 1 auto;
-    min-width:0;
-    text-align:right;
-    display:flex;align-items:baseline;justify-content:flex-end;gap:8px;
-  }
-  .row .val-main{
-    order:2;
-    flex:0 0 var(--time-col);text-align:right;
-    font-size:18px;font-weight:600;letter-spacing:.3px;font-variant-numeric:tabular-nums;
-    white-space:nowrap;
-  }
-  .row .val-minutes{
-    order:1;
-    color:var(--muted);font-size:11px;font-weight:600;letter-spacing:0;font-variant-numeric:tabular-nums;
-    flex:0 0 var(--minutes-col);text-align:right;white-space:nowrap;
-  }
-  .tape-empty{
-    color:var(--muted);font-size:13px;text-align:center;
-    padding:16px 14px;line-height:1.5;
-  }
-  .total{
-    flex:0 0 auto;border-top:1px solid var(--line);
-    display:flex;align-items:center;justify-content:space-between;
-    padding:10px 16px;
-  }
-  .total .lbl{color:var(--muted);font-size:12px;font-weight:700;letter-spacing:2px;}
-  .total .right{display:flex;align-items:center;justify-content:flex-end;flex:1 1 auto;min-width:0;margin-left:12px;}
-  .total-value{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;}
-  .total .sum{order:3;color:var(--amber);font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1;flex:0 0 auto;min-width:max-content;text-align:right;white-space:nowrap;}
-  .total .sum.compact{font-size:19px;}
-  .total .sum.tiny{font-size:16px;}
-  .total .sum-minutes{order:1;color:var(--muted);font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;line-height:14px;flex:0 1 var(--minutes-col);min-width:0;text-align:right;white-space:nowrap;}
-  .undo{
-    width:30px;height:30px;border-radius:50%;border:0;cursor:pointer;
-    background:#2b2b31;color:var(--muted);
-    display:flex;align-items:center;justify-content:center;
-    order:2;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 2px 0 rgba(0,0,0,.34);
-  }
-  .undo:active{background:var(--key-press);transform:translateY(1px);box-shadow:inset 0 2px 5px rgba(0,0,0,.3);}
-  .row.sum-divider{background:var(--amber-soft);border:1px solid rgba(232,148,58,.22);}
-  .row.sum-divider .sum-eq{color:var(--amber);font-size:17px;font-weight:700;width:24px;text-align:center;flex:0 0 auto;}
-  .row.sum-divider .val-main{color:var(--amber);}
-  .row.sum-divider .val-minutes{color:rgba(245,243,239,.62);}
-  .row.paren-row{
-    background:rgba(232,148,58,.08);
-    padding-top:5px;padding-bottom:5px;
-    border:1px solid rgba(232,148,58,.12);
-  }
-  .row.paren-row .idx{background:transparent;}
-  .row.paren-row .val-main{color:var(--muted);font-size:15px;font-weight:700;letter-spacing:0;}
-  .row.group-close .op{color:var(--amber);font-weight:800;}
-  .row.group-close .val-main{color:var(--amber);font-size:17px;letter-spacing:.3px;}
-  .row.group-close .val-minutes{color:rgba(245,243,239,.62);}
-
-  /* ---- Live display ---- */
-  .display{
-    flex:0 0 auto;text-align:right;
-    padding:0 12px 4px;
-    font-variant-numeric:tabular-nums;
-    display:flex;flex-direction:column;justify-content:flex-end;
-  }
-  .display .pending{color:var(--muted);font-size:16px;height:20px;line-height:20px;font-weight:500;letter-spacing:.5px;}
-  .display .current-line{display:flex;align-items:baseline;justify-content:flex-end;gap:10px;min-width:0;}
-  .display .current{color:var(--amber);font-size:clamp(40px,11vw,58px);font-weight:600;line-height:1;letter-spacing:1px;text-align:right;min-width:0;}
-  .display .current.compact{font-size:clamp(32px,8.4vw,46px);}
-  .display .current.tiny{font-size:clamp(24px,6.4vw,34px);}
-
-  /* ---- Keypad ---- */
-  .pad{
-    flex:0 0 auto;
-    display:grid;gap:7px;
-    grid-template-columns:repeat(4,1fr);
-    padding-bottom:4px; /* Browser-Modus: nur mini Abstand */
-  }
-  .parenbar{
-    flex:0 0 auto;
-    display:grid;grid-template-columns:repeat(2,1fr);gap:7px;
-    margin-bottom:7px;
-  }
-  .parenbar button{
-    border:0;border-radius:12px;cursor:pointer;
-    font-family:inherit;font-weight:700;
-    height:34px;font-size:18px;
-    color:var(--muted);background:var(--key);
-    display:flex;align-items:center;justify-content:center;
-    transition:background .10s ease-out, filter .10s ease-out;
-  }
-  .parenbar button:active{background:var(--key-press);filter:brightness(1.18);}
-  /* PWA/Standalone: native App-Optik – Keypad bewusst näher an den unteren Rand */
-  @media (display-mode: standalone){
-    .pad{ padding-bottom:8px; }
-  }
-  @media (max-width:480px){
-    .app{
-      max-width:none;
-      margin:0;
-    }
-  }
-  .pad button{
-    border:0;border-radius:16px;cursor:pointer;
-    font-family:inherit;font-weight:500;
-    height:clamp(54px,8.8vh,74px);
-    font-size:clamp(22px,6vw,28px);
-    color:var(--txt);background:var(--key);
-    display:flex;align-items:center;justify-content:center;
-    position:relative;overflow:hidden;
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.07), inset 0 -1px 0 rgba(0,0,0,.28), 0 4px 0 rgba(0,0,0,.32);
-    transition:transform .06s ease-out, background .10s ease-out, filter .10s ease-out, box-shadow .10s ease-out;
-    will-change:transform,filter;
-  }
-  .pad button::after{
-    content:"";
-    position:absolute;inset:0;border-radius:inherit;
-    background:rgba(255,255,255,.16);
-    opacity:0;transform:scale(.72);
-    pointer-events:none;
-  }
-  .pad button:active,
-  .pad button.is-pressed{
-    transform:translateY(3px) scale(.92);
-    filter:brightness(1.28) saturate(1.08);
-    box-shadow:inset 0 4px 9px rgba(0,0,0,.38), 0 1px 0 rgba(0,0,0,.36), 0 0 0 1px rgba(255,255,255,.08);
-  }
-  .pad button.is-pressed::after{
-    opacity:1;
-    transform:scale(1);
-  }
-  .pad button.key-pop{
-    animation:key-pop .24s cubic-bezier(.2,1.35,.35,1);
-  }
-  .pad button.key-pop::after{
-    animation:key-flash .24s ease-out;
-  }
-  @keyframes key-pop{
-    0%{transform:translateY(3px) scale(.92);}
-    48%{transform:translateY(-1px) scale(1.065);}
-    72%{transform:scale(.985);}
-    100%{transform:scale(1);}
-  }
-  @keyframes key-flash{
-    0%{opacity:.55;transform:scale(.74);}
-    100%{opacity:0;transform:scale(1.18);}
-  }
-  @media (prefers-reduced-motion: reduce){
-    .pad button{
-      transition:filter .10s ease-out, box-shadow .10s ease-out;
-    }
-    .pad button:active,
-    .pad button.is-pressed{
-      transform:none;
-      filter:brightness(1.2);
-      box-shadow:inset 0 3px 8px rgba(0,0,0,.28);
-    }
-    .pad button.key-pop,
-    .pad button.key-pop::after{
-      animation:none;
-    }
-  }
-  .pad .fn{color:var(--muted);}
-  .pad .clear{background:#3a201d;color:var(--red);font-weight:700;}
-  .pad .clear-soft{background:var(--key);color:var(--red);font-weight:700;}
-  .pad .op{background:var(--amber-soft);color:var(--amber);font-weight:600;}
-  .pad .op.armed{background:var(--amber);color:#1b1206;}
-  .pad .eq{background:#4f9d61;color:#0c1a0f;font-weight:700;}
-  .pad .wide{grid-column:span 2;}
-  .pad .colon{font-size:clamp(22px,5.6vw,26px);}
-  .pad .colon.armed{background:var(--amber-soft);color:var(--amber);}
-
-  /* ---- About overlay ---- */
-  .about-overlay{
-    position:fixed;inset:0;
-    background:rgba(0,0,0,.72);
-    display:flex;align-items:center;justify-content:center;
-    z-index:100;
-  }
-  .about-dialog{
-    background:var(--panel);border-radius:var(--radius);
-    padding:28px 24px 24px;text-align:center;max-width:280px;width:90%;
-    display:flex;flex-direction:column;align-items:center;gap:10px;
-  }
-  .about-icon{width:80px;height:80px;border-radius:20px;}
-  .about-title{margin:0;font-size:22px;font-weight:700;color:var(--txt);}
-  .about-sub{margin:0;font-size:13px;color:var(--muted);line-height:1.5;}
-  .about-version{margin:0;font-size:12px;color:var(--muted);opacity:.6;font-variant-numeric:tabular-nums;letter-spacing:.5px;}
-  .sound-setting{
-    width:100%;margin-top:4px;padding:10px 0;
-    display:flex;align-items:center;justify-content:space-between;gap:16px;
-    border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  }
-  .layout-setting{
-    width:100%;padding:10px 0;
-    display:flex;align-items:center;justify-content:space-between;gap:16px;
-    border-bottom:1px solid var(--line);
-  }
-  .setting-label{font-size:14px;font-weight:600;color:var(--txt);}
-  .sound-switch{
-    position:relative;width:46px;height:28px;flex:0 0 auto;
-  }
-  .sound-switch input{
-    position:absolute;opacity:0;width:1px;height:1px;
-  }
-  .sound-slider{
-    position:absolute;inset:0;border-radius:999px;
-    background:#2b2b31;cursor:pointer;
-    transition:background .18s ease;
-  }
-  .sound-slider::before{
-    content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;
-    border-radius:50%;background:var(--muted);
-    transition:transform .18s ease, background .18s ease;
-  }
-  .sound-switch input:checked + .sound-slider{background:var(--amber-soft);}
-  .sound-switch input:checked + .sound-slider::before{
-    transform:translateX(18px);background:var(--amber);
-  }
-  .side-options{
-    display:grid;grid-template-columns:repeat(2,1fr);gap:4px;
-    padding:4px;border-radius:12px;background:#2b2b31;
-    flex:0 0 118px;
-  }
-  .side-options input{
-    position:absolute;opacity:0;width:1px;height:1px;
-  }
-  .side-options label{
-    height:28px;border-radius:9px;
-    display:flex;align-items:center;justify-content:center;
-    color:var(--muted);font-size:13px;font-weight:700;
-    cursor:pointer;
-  }
-  .side-options input:checked + label{
-    background:var(--key);color:var(--txt);
-  }
-  .about-close{
-    margin-top:8px;border:0;border-radius:12px;cursor:pointer;
-    background:var(--key);color:var(--txt);font-family:inherit;
-    font-size:15px;font-weight:600;padding:10px 28px;
-  }
-  .about-close:active{background:var(--key-press);}
-
-  @media (min-width:760px) and (min-height:520px){
-    .app{
-      max-width:1120px;
-      display:grid;
-      grid-template-columns:minmax(300px, .95fr) minmax(360px, 480px);
-      grid-template-rows:auto minmax(0, 1fr) auto auto;
-      grid-template-areas:
-        "mode mode"
-        "tape display"
-        "tape paren"
-        "tape pad";
-      column-gap:12px;
-      padding:calc(var(--safe-t) + 12px) 12px max(var(--safe-b), 12px);
-    }
-    .app.history-right{
-      grid-template-columns:minmax(360px, 480px) minmax(300px, .95fr);
-      grid-template-areas:
-        "mode mode"
-        "display tape"
-        "paren tape"
-        "pad tape";
-    }
-    .modebar{
-      grid-area:mode;
-      max-width:480px;
-      width:100%;
-      justify-self:end;
-      margin-bottom:0;
-    }
-    .app.history-right .modebar{
-      justify-self:start;
-    }
-    .tape-wrap{
-      grid-area:tape;
-      min-height:0;
-      margin-bottom:0;
-      background:#131316;
-      border:1px solid rgba(255,255,255,.05);
-      box-shadow:inset 0 1px 0 rgba(255,255,255,.03), 0 14px 36px rgba(0,0,0,.22);
-    }
-    .tape-wrap .total{
-      background:rgba(12,12,14,.24);
-    }
-    .total .right{
-      flex:0 0 auto;
-      margin-left:0;
-    }
-    .total .sum{
-      flex:0 0 var(--time-col);
-    }
-    .total .sum-minutes{
-      flex:0 0 var(--minutes-col);
-    }
-    .display{
-      grid-area:display;
-      min-height:0;
-      align-self:end;
-      padding:0 12px 10px;
-    }
-    .display .current{
-      font-size:clamp(46px,6.8vw,72px);
-    }
-    .display .current.compact{
-      font-size:clamp(36px,5.2vw,54px);
-    }
-    .display .current.tiny{
-      font-size:clamp(26px,3.9vw,38px);
-    }
-    .parenbar{
-      grid-area:paren;
-      margin-bottom:7px;
-    }
-    .pad{
-      grid-area:pad;
-      padding-bottom:0;
-    }
-    .pad button{
-      height:clamp(54px,8.2vh,76px);
-      font-size:clamp(22px,3.2vw,28px);
-    }
-    .pad .colon{
-      font-size:clamp(22px,3vw,26px);
-    }
-  }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0c0c0e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <meta name="apple-mobile-web-app-title" content="Zeitrechner" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <title>Zeitrechner</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="stylesheet" href="src/app.css" />
 </head>
 <body>
-<div class="app" id="app">
-  <div class="modebar" id="modebar">
-    <button data-mode="time" class="modetab active"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Zeit</button>
-    <button data-mode="num" class="modetab"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>Rechner</button>
-    <button class="info-btn" id="infoBtn" aria-label="Über die App"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="12" y1="7" x2="12.01" y2="7"/></svg></button>
-  </div>
+  <main class="app" id="app">
+    <nav class="modebar" id="modebar" aria-label="Rechnermodus">
+      <button type="button" data-mode="time" class="modetab active" aria-pressed="true">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Zeit
+      </button>
+      <button type="button" data-mode="num" class="modetab" aria-pressed="false">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="10" x2="16" y2="14"/><line x1="8" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="12" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="8" y1="18" x2="12" y2="18"/></svg>
+        Rechner
+      </button>
+      <button type="button" class="info-btn" id="infoBtn" aria-label="Informationen und Einstellungen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="12" y1="7" x2="12.01" y2="7"/></svg>
+      </button>
+    </nav>
 
-  <div class="tape-wrap">
-    <div class="tape" id="tape"></div>
-    <div class="total">
-      <span class="lbl">SUMME</span>
-      <div class="right">
-        <div class="total-value">
-          <span class="sum-minutes" id="sumMinutes"></span>
-          <button class="undo" id="undo" aria-label="Letzten Schritt zurück"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 1 1-4.2 10.3"/></svg></button>
-          <span class="sum" id="sum">0</span>
+    <section class="tape-wrap" aria-label="Rechenverlauf">
+      <div class="tape" id="tape" tabindex="0"></div>
+      <div class="total">
+        <span class="lbl">SUMME</span>
+        <div class="right">
+          <div class="total-value">
+            <output class="sum-minutes" id="sumMinutes" aria-label="Summe in Minuten"></output>
+            <button type="button" class="undo" id="undo" aria-label="Letzten Schritt zurück" disabled>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 1 1-4.2 10.3"/></svg>
+            </button>
+            <output class="sum" id="sum" aria-label="Summe">0</output>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <div class="display">
-    <div class="pending" id="pending"></div>
-    <div class="current-line">
-      <div class="current" id="current">0</div>
-    </div>
-  </div>
-
-  <div class="parenbar">
-    <button id="openParen" aria-label="Klammer auf">(</button>
-    <button id="closeParen" aria-label="Klammer zu">)</button>
-  </div>
-
-  <div class="pad" id="pad"></div>
-</div>
-
-<div id="aboutOverlay" class="about-overlay" style="display:none" role="dialog" aria-modal="true" aria-label="Über die App">
-  <div class="about-dialog">
-    <img class="about-icon" src="icon-192.png" alt="" />
-    <h2 class="about-title">Zeitrechner</h2>
-    <p class="about-sub">Rechnen mit Zeiten und Zahlen.</p>
-    <p class="about-version">__COMMIT__</p>
-    <label class="sound-setting" for="soundToggle">
-      <span class="setting-label">Tastenklicks</span>
-      <span class="sound-switch">
-        <input type="checkbox" id="soundToggle" />
-        <span class="sound-slider"></span>
-      </span>
-    </label>
-    <div class="layout-setting">
-      <span class="setting-label">Verlauf</span>
-      <div class="side-options" id="historySideOptions" role="radiogroup" aria-label="Position des Verlaufs im Querformat">
-        <input type="radio" id="historyLeft" name="historySide" value="left" />
-        <label for="historyLeft">Links</label>
-        <input type="radio" id="historyRight" name="historySide" value="right" />
-        <label for="historyRight">Rechts</label>
+    <section class="display" aria-label="Aktuelle Eingabe" aria-live="polite" aria-atomic="true">
+      <div class="pending" id="pending" aria-hidden="true"></div>
+      <div class="current-line">
+        <output class="current" id="current">0</output>
       </div>
-    </div>
-    <button class="about-close" id="aboutClose">Schließen</button>
-  </div>
-</div>
+    </section>
 
-<script src="src/calculator-core.js"></script>
-<script src="src/app.js"></script>
+    <div class="parenbar" aria-label="Klammern">
+      <button type="button" id="openParen" aria-label="Klammer auf">(</button>
+      <button type="button" id="closeParen" aria-label="Klammer zu" disabled>)</button>
+    </div>
+
+    <div class="pad" id="pad" aria-label="Tastenfeld"></div>
+  </main>
+
+  <dialog id="aboutDialog" class="about-dialog" aria-labelledby="aboutTitle">
+    <div class="about-card">
+      <img class="about-icon" src="icon-192.png" alt="" />
+      <h2 class="about-title" id="aboutTitle">Zeitrechner</h2>
+      <p class="about-sub">Rechnen mit Zeiten und Zahlen.</p>
+      <p class="about-version">__COMMIT__</p>
+      <label class="sound-setting" for="soundToggle">
+        <span class="setting-label">Tastenklicks</span>
+        <span class="sound-switch">
+          <input type="checkbox" id="soundToggle" />
+          <span class="sound-slider" aria-hidden="true"></span>
+        </span>
+      </label>
+      <div class="layout-setting">
+        <span class="setting-label">Verlauf</span>
+        <div class="side-options" id="historySideOptions" role="radiogroup" aria-label="Position des Verlaufs im Querformat">
+          <input type="radio" id="historyLeft" name="historySide" value="left" />
+          <label for="historyLeft">Links</label>
+          <input type="radio" id="historyRight" name="historySide" value="right" />
+          <label for="historyRight">Rechts</label>
+        </div>
+      </div>
+      <button type="button" class="about-close" id="aboutClose">Schließen</button>
+    </div>
+  </dialog>
+
+  <script src="src/calculator-core.js"></script>
+  <script src="src/state-store.js"></script>
+  <script src="src/app.js"></script>
 </body>
 </html>
-

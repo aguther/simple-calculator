@@ -1,21 +1,20 @@
 # Zeitrechner
 
-A small installable web app for calculating with times and regular numbers.
-It is intentionally built with plain HTML, CSS, and JavaScript: no framework,
-no bundler, and no runtime dependencies.
+An installable time and number calculator built with plain HTML, CSS, and
+JavaScript. The production app has no runtime dependencies; Playwright is used
+only for development and CI verification.
 
 ## Features
 
-- Time calculator with `H:MM` and `H:MM:SS` input.
-- Fast shorthand time entry: `145` becomes `1:45`.
-- Regular number calculator mode.
-- Operator precedence and parentheses.
-- Running tape with intermediate sums.
-- Minutes conversion for time results.
-- Separate saved state for time and number mode.
-- Optional key sounds, haptic feedback where supported, and hardware keyboard input.
-- Responsive mobile/desktop layout.
-- PWA manifest and service worker for installation and offline use.
+- Time calculations with `H:MM` and `H:MM:SS`, including negative results.
+- Fast shorthand input (`145` becomes `1:45`), operator precedence,
+  parentheses, intermediate sums, and a scrollable calculation tape.
+- A regular number mode with separately persisted calculator state.
+- Explicit recovery from undefined operations such as division by zero.
+- Keyboard input, optional key sounds, and haptic feedback where supported.
+- Responsive portrait and landscape layouts with dynamic viewport and safe-area
+  support, browser zoom, and accessible controls.
+- Installable, offline-capable PWA with versioned app-shell updates.
 
 ## Input
 
@@ -27,65 +26,80 @@ In time mode, entries without a colon treat the last two digits as minutes:
 | `145` | `1:45` |
 | `1230` | `12:30` |
 
-Entries with colons are parsed left to right:
+Entries containing colons are parsed from left to right. For example, `1:2`
+means `1:02`, while `1::15` means `1:00:15`. After multiplication or division,
+a plain entry is treated as a scalar: `1:30 × 2` produces `3:00`.
 
-| Input | Meaning |
-| --- | --- |
-| `1:2` | `1:02` |
-| `1:23` | `1:23` |
-| `1::15` | `1:00:15` |
+## Local development and tests
 
-For multiplication and division in time mode, a plain entry after `x` or `/`
-is treated as a scalar. For example, `1:30 x 2` gives `3:00`.
+Install the development dependency and the three browser engines once:
 
-## Local Development
+```sh
+npm ci
+npx playwright install chromium firefox webkit
+```
 
-Run the core and browser smoke tests:
+Run the complete release gate:
 
 ```sh
 npm test
 ```
 
-Run only the pure calculation tests:
+The gate runs Node unit tests, a deterministic production build, build and
+security-contract tests, and Playwright scenarios in Chromium, Firefox, and
+WebKit. The browser matrix covers compact phones, current phone proportions,
+landscape orientations, desktop, keyboard/dialog behavior, 200% text sizing,
+offline reloads, and atomic PWA updates.
 
-```sh
-npm run test:core
-```
+Individual checks are available as `npm run test:unit`, `npm run test:build`,
+`npm run test:ui`, and `npm run test:ui:chromium`.
 
-Run only the rendered browser smoke test:
-
-```sh
-npm run test:ui
-```
-
-Build the deployable static files into `dist`:
+Build deployable static files into `dist` with:
 
 ```sh
 npm run build
 ```
 
-The app can also be opened directly from `index.html` during development.
-For service worker behavior, serve it over `http://localhost`.
+The build emits content-hashed CSS and JavaScript assets, rewrites the HTML and
+service-worker precache list to those exact names, and copies the Cloudflare
+`_headers` contract. Run the app through an HTTP server when checking service
+worker behavior; opening `index.html` directly remains useful only for simple
+UI development.
+
+## Diagnostics
+
+Append `?diagnostics=1` to the URL to open a local-only diagnostic dialog. Its
+copyable JSON contains viewport, screen, orientation, safe-area, display-mode,
+app-build, and active service-worker-version information. It contains no stored
+calculator data or personal information and does not change persisted state.
+
+The normal release process does not depend on a personal iPhone or other
+physical device. A real-device check can add evidence for an operating-system
+specific issue, but is optional. Playwright WebKit is valuable cross-engine
+coverage and does not fully emulate an installed iOS Home Screen PWA.
 
 ## Deployment
 
-The project is configured for Cloudflare Workers static assets:
+The project is configured for Cloudflare static assets:
 
 ```sh
 npm run build
 wrangler deploy
 ```
 
-`build.js` copies the app into `dist` and replaces the `__COMMIT__` marker in
-the About dialog with the current commit hash.
+HTML, the manifest, and service worker are revalidated. Only content-hashed
+assets receive immutable long-term caching. `_headers` also defines the CSP,
+anti-framing, content-type, referrer, and permissions policies. No application
+Worker logic is required.
 
-## Project Structure
+## Project structure
 
-- `index.html` contains the app shell and styles.
+- `index.html` contains the semantic application shell.
+- `src/app.css` contains responsive layout and component styles.
 - `src/calculator-core.js` contains the pure parser, formatter, and evaluator.
-- `src/app.js` contains UI state, rendering, persistence, and input handling.
-- `test/calculator-core.test.js` covers pure calculation behavior.
-- `test/browser-smoke.test.js` opens the rendered app in a headless browser and
-  verifies a real user flow.
-- `sw.js` provides the offline cache.
-- `manifest.webmanifest` defines installable PWA metadata.
+- `src/state-store.js` validates schema-v5 state and migrates valid v4 data.
+- `src/app.js` contains rendering and input orchestration.
+- `build.js`, `sw.js`, and `_headers` implement the production PWA contract.
+- `test/*.test.js` contains unit and build-contract tests.
+- `test/e2e/` contains the cross-browser layout, interaction, offline, and
+  update scenarios.
