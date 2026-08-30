@@ -14,11 +14,13 @@
 
   function entryToSeconds(e){
     if(!e) return 0;
+    var sign = e.charAt(0)==="-" ? -1 : 1;
+    if(sign<0) e=e.slice(1);
     var h, m, mStr, s, sStr, parts;
     if(!e.includes(":")){
       m = Number.parseInt(e.slice(-2)||"0",10);
       h = parseIntLoose(e.slice(0,-2)||"0");
-      return h*3600 + m*60;
+      return sign*(h*3600 + m*60);
     }
     parts = e.split(":");
     h = parseIntLoose(parts[0]||"0");
@@ -29,24 +31,26 @@
       sStr = parts[2]||"";
       s = Number.parseInt(sStr||"0",10);
     }
-    return h*3600 + m*60 + s;
+    return sign*(h*3600 + m*60 + s);
   }
   function fmtTimeEntry(e){
     if(!e) return "0:00";
+    var sign = e.charAt(0)==="-" ? "−" : "";
+    if(sign) e=e.slice(1);
     var h, m, mStr, mDisp, parts, sStr, sDisp;
     if(!e.includes(":")){
       m = Number.parseInt(e.slice(-2)||"0",10);
       h = parseIntLoose(e.slice(0,-2)||"0");
-      return groupInt(h)+":"+pad2(m);
+      return sign+groupInt(h)+":"+pad2(m);
     }
     parts = e.split(":");
     h = groupInt(parseIntLoose(parts[0]||"0"));
     mStr = parts[1]||"";
     if(mStr.length===0) mDisp="00"; else if(mStr.length===1) mDisp="0"+mStr; else mDisp=mStr;
-    if(parts.length===2) return h+":"+mDisp;
+    if(parts.length===2) return sign+h+":"+mDisp;
     sStr = parts[2]||"";
     if(sStr.length===0) sDisp="00"; else if(sStr.length===1) sDisp="0"+sStr; else sDisp=sStr;
-    return h+":"+mDisp+":"+sDisp;
+    return sign+h+":"+mDisp+":"+sDisp;
   }
   function fmtSeconds(total){
     if(!Number.isFinite(total)) return "—";
@@ -84,10 +88,11 @@
   }
   function valueToEntry(v, mode){
     if(mode==="time"){
+      var sign=v<0?"-":"";
       var total=Math.abs(Math.round(v));
       var h=Math.floor(total/3600), m=Math.floor((total%3600)/60), s=total%60;
-      if(s>0) return h+":"+pad2(m)+":"+pad2(s);
-      return h+":"+pad2(m);
+      if(s>0) return sign+h+":"+pad2(m)+":"+pad2(s);
+      return sign+h+":"+pad2(m);
     }
     if(!Number.isFinite(v)) return "";
     var r=Math.round(v*1e6)/1e6;
