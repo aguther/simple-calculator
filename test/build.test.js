@@ -57,3 +57,11 @@ test("manifest and Cloudflare headers encode the deployment contract", () => {
     assert.doesNotMatch(source[1], /^(?:data:|https?:|\/\/)/, "CSP-external resource: " + source[1]);
   }
 });
+
+test("standalone layout overrides unreliable dynamic viewport units", () => {
+  const css = fs.readFileSync(path.join(ROOT, "src", "app.css"), "utf8");
+  const standalone = css.match(/@media \(display-mode: standalone\)\s*\{([\s\S]*?)\n\}/);
+  assert.ok(standalone, "missing standalone viewport override");
+  assert.match(standalone[1], /body,\s*\.app\s*\{[\s\S]*height:\s*100vh/);
+  assert.doesNotMatch(standalone[1], /height:\s*100[dl]vh/);
+});

@@ -87,8 +87,15 @@ button:disabled {
 }
 
 @media (display-mode: standalone) {
+  body,
   .app {
-    height: 100lvh;
+    /*
+     * Installed iOS web apps can report dvh/lvh outside the actually visible
+     * standalone viewport. Keep the root and app on the same legacy viewport
+     * height there; unlike the newer units, vh includes the safe-area region
+     * that is consumed by the app padding below.
+     */
+    height: 100vh;
   }
 }
 
