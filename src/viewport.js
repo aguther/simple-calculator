@@ -33,10 +33,31 @@
     };
   }
 
+  function resetScroll(win,doc){
+    [doc.scrollingElement,doc.documentElement,doc.body].forEach(function(element){
+      if(!element) return;
+      element.scrollTop=0;
+      element.scrollLeft=0;
+    });
+    if(typeof win.scrollTo==="function"){
+      try{ win.scrollTo(0,0); }catch(error){}
+    }
+  }
+
+  function orientationKey(win){
+    var width=positive(win && win.innerWidth);
+    var height=positive(win && win.innerHeight);
+    if(!width || !height) return "unknown";
+    return width>height ? "landscape" : "portrait";
+  }
+
   function install(win,doc){
     var root=doc.documentElement;
     var frame=0;
     var stopped=false;
+    var timers=[];
+    var lastOrientation=orientationKey(win);
+    var revision=0;
 
     function update(){
       frame=0;
@@ -46,6 +67,7 @@
         root.style.setProperty("--app-height",measurement.height+"px");
         root.dataset.viewportHeight=String(measurement.height);
       }
+      root.dataset.viewportOrientation=orientationKey(win);
       return measurement;
     }
 
@@ -54,16 +76,41 @@
       frame=win.requestAnimationFrame(update);
     }
 
-    win.addEventListener("resize",schedule,{passive:true});
-    win.addEventListener("orientationchange",schedule,{passive:true});
-    win.addEventListener("pageshow",schedule,{passive:true});
+    function stabilize(){
+      timers.forEach(function(timer){ win.clearTimeout(timer); });
+      timers=[];
+      [0,60,180,360,700].forEach(function(delay){
+        timers.push(win.setTimeout(function(){
+          if(stopped) return;
+          resetScroll(win,doc);
+          update();
+          revision++;
+          root.dataset.viewportRevision=String(revision);
+        },delay));
+      });
+    }
+
+    function handleResize(){
+      var nextOrientation=orientationKey(win);
+      schedule();
+      if(nextOrientation!==lastOrientation){
+        lastOrientation=nextOrientation;
+        stabilize();
+      }
+    }
+
+    function handleOrientation(){ stabilize(); }
+    function handlePageShow(){ stabilize(); }
+
+    win.addEventListener("resize",handleResize,{passive:true});
+    win.addEventListener("orientationchange",handleOrientation,{passive:true});
+    win.addEventListener("pageshow",handlePageShow,{passive:true});
     if(win.visualViewport){
       win.visualViewport.addEventListener("resize",schedule,{passive:true});
       win.visualViewport.addEventListener("scroll",schedule,{passive:true});
     }
     update();
-    win.setTimeout(update,0);
-    win.setTimeout(update,250);
+    stabilize();
 
     return {
       update:update,
@@ -71,9 +118,10 @@
       destroy:function(){
         stopped=true;
         if(frame) win.cancelAnimationFrame(frame);
-        win.removeEventListener("resize",schedule);
-        win.removeEventListener("orientationchange",schedule);
-        win.removeEventListener("pageshow",schedule);
+        timers.forEach(function(timer){ win.clearTimeout(timer); });
+        win.removeEventListener("resize",handleResize);
+        win.removeEventListener("orientationchange",handleOrientation);
+        win.removeEventListener("pageshow",handlePageShow);
         if(win.visualViewport){
           win.visualViewport.removeEventListener("resize",schedule);
           win.visualViewport.removeEventListener("scroll",schedule);
@@ -82,5 +130,5 @@
     };
   }
 
-  return {measureViewport:measureViewport,install:install};
+  return {measureViewport:measureViewport,resetScroll:resetScroll,orientationKey:orientationKey,install:install};
 });
