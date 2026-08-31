@@ -171,4 +171,32 @@ test.describe("calculator interactions", () => {
     expect(layout.height).toBe(812);
     expect(layout.bottom).toBe(812);
   });
+
+  test("recovers the header after portrait landscape portrait rotation", async ({ page }) => {
+    const info = page.getByRole("button", { name: "Informationen und Einstellungen" });
+    await expect(info).toBeVisible();
+    await page.setViewportSize({ width: 874, height: 402 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.viewportOrientation)).toBe("landscape");
+    await expect(info).toBeVisible();
+    await expect(page.getByRole("status", { name: "Summe in Minuten" })).toBeHidden();
+
+    await page.evaluate(() => {
+      document.documentElement.style.overflow = "auto";
+      document.body.style.overflow = "auto";
+      document.body.style.minHeight = "1200px";
+      window.scrollTo(0, 62);
+    });
+    await page.setViewportSize({ width: 402, height: 874 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.viewportOrientation)).toBe("portrait");
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await expect(info).toBeVisible();
+    const geometry = await page.evaluate(() => {
+      const app = document.getElementById("app").getBoundingClientRect();
+      const modebar = document.getElementById("modebar").getBoundingClientRect();
+      return { appTop: app.top, modebarTop: modebar.top, modebarBottom: modebar.bottom };
+    });
+    expect(geometry.appTop).toBeGreaterThanOrEqual(-1);
+    expect(geometry.modebarTop).toBeGreaterThanOrEqual(geometry.appTop - 1);
+    expect(geometry.modebarBottom).toBeGreaterThan(geometry.modebarTop);
+  });
 });

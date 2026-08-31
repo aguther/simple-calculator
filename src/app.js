@@ -636,13 +636,13 @@
       build:document.querySelector(".about-version").textContent.trim(),
       browser:{userAgent:navigator.userAgent,platform:navigator.platform,touchPoints:navigator.maxTouchPoints || 0},
       displayMode:matchMedia("(display-mode: standalone)").matches || navigator.standalone===true ? "standalone" : "browser",
-      window:{innerWidth:innerWidth,innerHeight:innerHeight},
-      document:{clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight},
-      visualViewport:viewport ? {width:viewport.width,height:viewport.height,offsetTop:viewport.offsetTop,offsetLeft:viewport.offsetLeft,scale:viewport.scale} : null,
+      window:{innerWidth:innerWidth,innerHeight:innerHeight,scrollX:scrollX,scrollY:scrollY},
+      document:{clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight,scrollTop:document.scrollingElement ? document.scrollingElement.scrollTop : null,bodyScrollTop:document.body.scrollTop},
+      visualViewport:viewport ? {width:viewport.width,height:viewport.height,offsetTop:viewport.offsetTop,offsetLeft:viewport.offsetLeft,pageTop:viewport.pageTop,pageLeft:viewport.pageLeft,scale:viewport.scale} : null,
       screen:{width:screen.width,height:screen.height,availWidth:screen.availWidth,availHeight:screen.availHeight,orientation:orientation ? orientation.type : "unbekannt"},
       cssViewportUnits:{vh:unitValue("vh"),dvh:unitValue("dvh"),svh:unitValue("svh"),lvh:unitValue("lvh")},
       safeArea:{top:safeValue("top"),right:safeValue("right"),bottom:safeValue("bottom"),left:safeValue("left")},
-      appliedViewport:{cssVariable:getComputedStyle(document.documentElement).getPropertyValue("--app-height").trim(),measurement:runtime},
+      appliedViewport:{cssVariable:getComputedStyle(document.documentElement).getPropertyValue("--app-height").trim(),orientation:document.documentElement.dataset.viewportOrientation || null,revision:document.documentElement.dataset.viewportRevision || null,measurement:runtime},
       app:{top:appRect.top,right:appRect.right,bottom:appRect.bottom,left:appRect.left,width:appRect.width,height:appRect.height,lastButtonBottom:lastButton ? lastButton.bottom : null},
       serviceWorker:{status:swVersion ? "aktiv" : "nicht aktiv",version:swVersion}
     };
