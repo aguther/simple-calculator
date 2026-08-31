@@ -24,7 +24,7 @@ test("build is deterministic and references complete hashed assets", () => {
 
   const html = fs.readFileSync(path.join(DIST, "index.html"), "utf8");
   const serviceWorker = fs.readFileSync(path.join(DIST, "sw.js"), "utf8");
-  assert.doesNotMatch(html, /__COMMIT__|src\/app\.(?:css|js)|src\/calculator-core\.js|src\/state-store\.js/);
+  assert.doesNotMatch(html, /__COMMIT__|src\/app\.(?:css|js)|src\/viewport\.js|src\/calculator-core\.js|src\/state-store\.js/);
   assert.doesNotMatch(serviceWorker, /__BUILD_VERSION__/);
   assert.match(serviceWorker, new RegExp(first.version));
 
@@ -58,10 +58,11 @@ test("manifest and Cloudflare headers encode the deployment contract", () => {
   }
 });
 
-test("standalone layout overrides unreliable dynamic viewport units", () => {
+test("layout uses the runtime measured viewport height", () => {
   const css = fs.readFileSync(path.join(ROOT, "src", "app.css"), "utf8");
-  const standalone = css.match(/@media \(display-mode: standalone\)\s*\{([\s\S]*?)\n\}/);
-  assert.ok(standalone, "missing standalone viewport override");
-  assert.match(standalone[1], /body,\s*\.app\s*\{[\s\S]*height:\s*100vh/);
-  assert.doesNotMatch(standalone[1], /height:\s*100[dl]vh/);
+  const viewport = fs.readFileSync(path.join(ROOT, "src", "viewport.js"), "utf8");
+  assert.match(css, /--app-height:\s*100vh/);
+  assert.match(css, /height:\s*var\(--app-height\)/);
+  assert.match(viewport, /Math\.min\.apply\(Math,values\)/);
+  assert.match(viewport, /setProperty\("--app-height"/);
 });

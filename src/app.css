@@ -18,6 +18,11 @@
   --safe-r: env(safe-area-inset-right, 0px);
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-l: env(safe-area-inset-left, 0px);
+  --app-height: 100vh;
+}
+
+@supports (height: 100dvh) {
+  :root { --app-height: 100dvh; }
 }
 
 * {
@@ -28,7 +33,8 @@
 html,
 body {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
+  min-height: 0;
   margin: 0;
   background: var(--bg);
   color: var(--txt);
@@ -40,8 +46,7 @@ html {
 }
 
 body {
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: var(--app-height);
   overflow: hidden;
   overscroll-behavior: none;
   user-select: none;
@@ -74,8 +79,7 @@ button:disabled {
   position: relative;
   width: 100%;
   max-width: 480px;
-  height: 100vh;
-  height: 100dvh;
+  height: var(--app-height);
   margin-inline: auto;
   overflow: hidden;
   display: flex;
@@ -84,19 +88,6 @@ button:disabled {
   padding-right: max(12px, var(--safe-r));
   padding-bottom: max(8px, var(--safe-b));
   padding-left: max(12px, var(--safe-l));
-}
-
-@media (display-mode: standalone) {
-  body,
-  .app {
-    /*
-     * Installed iOS web apps can report dvh/lvh outside the actually visible
-     * standalone viewport. Keep the root and app on the same legacy viewport
-     * height there; unlike the newer units, vh includes the safe-area region
-     * that is consumed by the app padding below.
-     */
-    height: 100vh;
-  }
 }
 
 .modebar {
@@ -537,23 +528,20 @@ button:disabled {
 .pad .colon { font-size: clamp(22px, 5.6vw, 26px); }
 .pad .colon.armed { background: var(--amber-soft); color: var(--amber); }
 
-.about-dialog,
-.diagnostics-dialog {
+.about-dialog {
   border: 0;
   padding: 0;
   color: var(--txt);
   background: transparent;
 }
 
-.about-dialog::backdrop,
-.diagnostics-dialog::backdrop {
+.about-dialog::backdrop {
   background: rgba(0, 0, 0, 0.72);
 }
 
-.about-card,
-.diagnostics-card {
+.about-card {
   width: min(90vw, 320px);
-  max-height: min(88dvh, 720px);
+  max-height: min(calc(var(--app-height) - 24px), 720px);
   overflow: auto;
   border-radius: var(--radius);
   padding: 24px;
@@ -570,6 +558,29 @@ button:disabled {
 .about-title { margin: 0; font-size: 22px; font-weight: 700; }
 .about-sub { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
 .about-version { margin: 0; font-size: 12px; color: var(--muted); opacity: 0.8; font-variant-numeric: tabular-nums; letter-spacing: 0.5px; }
+
+.diagnostics-toggle {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--txt);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.diagnostics-panel {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--bg);
+  text-align: left;
+}
+
+.diagnostics-panel[hidden] { display: none; }
 
 .sound-setting,
 .layout-setting {
@@ -637,8 +648,7 @@ button:disabled {
 .side-options input:checked + label { background: var(--key); color: var(--txt); }
 
 .about-close,
-.diagnostics-copy,
-.diagnostics-close {
+.diagnostics-copy {
   min-height: 44px;
   border: 0;
   border-radius: 12px;
@@ -652,16 +662,11 @@ button:disabled {
 
 .about-close { margin-top: 8px; }
 
-.diagnostics-card {
-  width: min(94vw, 520px);
-  align-items: stretch;
-  text-align: left;
-}
-
-.diagnostics-title { margin: 0; font-size: 20px; }
+.diagnostics-title { margin: 0 0 8px; font-size: 16px; }
 .diagnostics-output {
   margin: 0;
   padding: 12px;
+  max-height: min(34vh, 260px);
   overflow: auto;
   border-radius: 12px;
   background: var(--bg);
@@ -672,10 +677,11 @@ button:disabled {
   white-space: pre-wrap;
 }
 
-.diagnostics-actions { display: flex; justify-content: flex-end; gap: 8px; }
-.diagnostics-status { min-height: 20px; margin: 0; color: var(--muted); font-size: 13px; }
+.diagnostics-status { min-height: 20px; margin: 6px 0; color: var(--muted); font-size: 13px; }
+.diagnostics-copy { width: 100%; }
 
-.safe-probe {
+.safe-probe,
+.viewport-probe {
   position: fixed;
   width: 0;
   height: 0;
@@ -687,6 +693,10 @@ button:disabled {
 .safe-probe-right { padding-right: var(--safe-r); }
 .safe-probe-bottom { padding-bottom: var(--safe-b); }
 .safe-probe-left { padding-left: var(--safe-l); }
+.viewport-probe-vh { height: 100vh; }
+.viewport-probe-dvh { height: 100dvh; }
+.viewport-probe-svh { height: 100svh; }
+.viewport-probe-lvh { height: 100lvh; }
 
 @media (max-height: 700px) {
   .app {

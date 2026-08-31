@@ -68,6 +68,13 @@
       <h2 class="about-title" id="aboutTitle">Zeitrechner</h2>
       <p class="about-sub">Rechnen mit Zeiten und Zahlen.</p>
       <p class="about-version">__COMMIT__</p>
+      <button type="button" class="diagnostics-toggle" id="diagnosticsToggle" aria-expanded="false" aria-controls="diagnosticsPanel">Diagnose anzeigen</button>
+      <section class="diagnostics-panel" id="diagnosticsPanel" aria-labelledby="diagnosticsTitle" hidden>
+        <h3 class="diagnostics-title" id="diagnosticsTitle">Layout-Diagnose</h3>
+        <pre class="diagnostics-output" id="diagnosticsOutput"></pre>
+        <p class="diagnostics-status" id="diagnosticsStatus" aria-live="polite"></p>
+        <button type="button" class="diagnostics-copy" id="diagnosticsCopy">JSON kopieren</button>
+      </section>
       <label class="sound-setting" for="soundToggle">
         <span class="setting-label">Tastenklicks</span>
         <span class="sound-switch">
@@ -88,6 +95,7 @@
     </div>
   </dialog>
 
+  <script src="src/viewport.js"></script>
   <script src="src/calculator-core.js"></script>
   <script src="src/state-store.js"></script>
   <script src="src/app.js"></script>

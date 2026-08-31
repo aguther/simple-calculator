@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node build.js",
     "test": "npm run test:unit && npm run build && npm run test:build && npm run test:ui",
-    "test:unit": "node --test test/calculator-core.test.js test/state-store.test.js",
+    "test:unit": "node --test test/calculator-core.test.js test/state-store.test.js test/viewport.test.js",
     "test:build": "node --test test/build.test.js",
     "test:ui": "playwright test",
     "test:ui:chromium": "playwright test --project=chromium"

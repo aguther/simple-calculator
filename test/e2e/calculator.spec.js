@@ -117,17 +117,58 @@ test.describe("calculator interactions", () => {
     await expect(page.getByRole("button", { name: "Ergebnis" })).toBeVisible();
   });
 
-  test("exposes diagnostics only through the query flag", async ({ page }) => {
-    await expect(page.getByRole("dialog", { name: "Layout-Diagnose" })).toHaveCount(0);
-    await page.goto("/?diagnostics=1");
-    const dialog = page.getByRole("dialog", { name: "Layout-Diagnose" });
-    await expect(dialog).toBeVisible();
-    const report = JSON.parse(await dialog.locator("pre").textContent());
+  test("exposes copyable diagnostics inside the information dialog", async ({ page }) => {
+    await page.getByRole("button", { name: "Informationen und Einstellungen" }).click();
+    const about = page.getByRole("dialog", { name: "Zeitrechner" });
+    await expect(about).toBeVisible();
+    const toggle = about.locator("#diagnosticsToggle");
+    await expect(toggle).toHaveAccessibleName("Diagnose anzeigen");
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(toggle).toHaveAccessibleName("Diagnose ausblenden");
+    const output = about.locator(".diagnostics-output");
+    await expect(output).not.toBeEmpty();
+    const report = JSON.parse(await output.textContent());
     expect(report).toHaveProperty("displayMode");
     expect(report).toHaveProperty("visualViewport");
     expect(report).toHaveProperty("safeArea.bottom");
+    expect(report).toHaveProperty("cssViewportUnits.dvh");
+    expect(report).toHaveProperty("appliedViewport.measurement.height");
+    expect(report).toHaveProperty("app.lastButtonBottom");
     expect(report).toHaveProperty("build");
     expect(report).toHaveProperty("serviceWorker.status");
     expect(report).toHaveProperty("serviceWorker.version");
+    await page.evaluate(() => {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: async (text) => { window.__copiedDiagnostics = text; } }
+      });
+    });
+    await about.getByRole("button", { name: "JSON kopieren" }).click();
+    await expect(about.locator("#diagnosticsStatus")).toHaveText("Diagnose kopiert.");
+    const copied = await page.evaluate(() => window.__copiedDiagnostics);
+    expect(JSON.parse(copied)).toHaveProperty("build", report.build);
+  });
+
+  test("keeps the diagnostics query as a direct shortcut", async ({ page }) => {
+    await page.goto("/?diagnostics=1");
+    const dialog = page.getByRole("dialog", { name: "Zeitrechner" });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Diagnose ausblenden" })).toHaveAttribute("aria-expanded", "true");
+    await expect(dialog.locator(".diagnostics-output")).not.toBeEmpty();
+  });
+
+  test("uses a smaller runtime viewport measurement instead of legacy vh", async ({ page }) => {
+    await page.evaluate(() => {
+      Object.defineProperty(window, "innerHeight", { configurable: true, value: 812 });
+      window.dispatchEvent(new Event("resize"));
+    });
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--app-height").trim())).toBe("812px");
+    const layout = await page.evaluate(() => {
+      const app = document.getElementById("app").getBoundingClientRect();
+      return { height: app.height, bottom: app.bottom };
+    });
+    expect(layout.height).toBe(812);
+    expect(layout.bottom).toBe(812);
   });
 });

@@ -27,6 +27,7 @@ function commitVersion() {
 
 const sourceAssets = [
   { source: "src/app.css", name: "app", extension: ".css" },
+  { source: "src/viewport.js", name: "viewport", extension: ".js" },
   { source: "src/calculator-core.js", name: "calculator-core", extension: ".js" },
   { source: "src/state-store.js", name: "state-store", extension: ".js" },
   { source: "src/app.js", name: "app", extension: ".js" }
