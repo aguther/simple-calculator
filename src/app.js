@@ -1,6 +1,7 @@
 (function(){
   "use strict";
 
+  var viewportController=window.CalculatorViewport ? window.CalculatorViewport.install(window,document) : null;
   var core=window.CalculatorCore;
   var stateStore=window.CalculatorStateStore;
   var loaded=stateStore.load(localStorage);
@@ -32,6 +33,11 @@
     infoBtn:document.getElementById("infoBtn"),
     aboutDialog:document.getElementById("aboutDialog"),
     aboutClose:document.getElementById("aboutClose"),
+    diagnosticsToggle:document.getElementById("diagnosticsToggle"),
+    diagnosticsPanel:document.getElementById("diagnosticsPanel"),
+    diagnosticsOutput:document.getElementById("diagnosticsOutput"),
+    diagnosticsStatus:document.getElementById("diagnosticsStatus"),
+    diagnosticsCopy:document.getElementById("diagnosticsCopy"),
     soundToggle:document.getElementById("soundToggle"),
     historySideOptions:document.getElementById("historySideOptions")
   };
@@ -551,11 +557,7 @@
   el.openParen.addEventListener("click",function(){ feedback(); pressOpenParen(); });
   el.closeParen.addEventListener("click",function(){ feedback(); pressCloseParen(); });
 
-  el.infoBtn.addEventListener("click",function(){
-    feedback();
-    el.aboutDialog.showModal();
-    el.aboutClose.focus();
-  });
+  el.infoBtn.addEventListener("click",function(){ feedback(); openAbout(false); });
   el.aboutClose.addEventListener("click",function(){ feedback(); el.aboutDialog.close(); });
   el.aboutDialog.addEventListener("close",function(){ el.infoBtn.focus(); });
   el.aboutDialog.addEventListener("click",function(event){
@@ -574,7 +576,7 @@
   });
 
   window.addEventListener("keydown",function(event){
-    if(el.aboutDialog.open || document.querySelector(".diagnostics-dialog[open]")) return;
+    if(el.aboutDialog.open) return;
     var key=event.key;
     if(key>="0" && key<="9") pressDigit(key);
     else if(key==="+") pressOp("+");
@@ -597,64 +599,106 @@
     return probe;
   }
 
-  function setupDiagnostics(){
-    if(new URLSearchParams(location.search).get("diagnostics")!=="1") return;
-    var dialog=document.createElement("dialog");
-    dialog.className="diagnostics-dialog";
-    dialog.setAttribute("aria-labelledby","diagnosticsTitle");
-    dialog.innerHTML='<div class="diagnostics-card"><h2 class="diagnostics-title" id="diagnosticsTitle">Layout-Diagnose</h2><pre class="diagnostics-output"></pre><p class="diagnostics-status" aria-live="polite"></p><div class="diagnostics-actions"><button type="button" class="diagnostics-copy">JSON kopieren</button><button type="button" class="diagnostics-close">Schließen</button></div></div>';
-    document.body.appendChild(dialog);
-    var output=dialog.querySelector(".diagnostics-output");
-    var status=dialog.querySelector(".diagnostics-status");
-    var probes={top:createSafeProbe("safe-probe-top"),right:createSafeProbe("safe-probe-right"),bottom:createSafeProbe("safe-probe-bottom"),left:createSafeProbe("safe-probe-left")};
+  function createViewportProbe(className){
+    var probe=document.createElement("span");
+    probe.className="viewport-probe "+className;
+    document.body.appendChild(probe);
+    return probe;
+  }
 
-    function serviceWorkerVersion(){
-      return new Promise(function(resolve){
-        var controller=navigator.serviceWorker && navigator.serviceWorker.controller;
-        if(!controller){ resolve(null); return; }
-        var channel=new MessageChannel();
-        var timeout=setTimeout(function(){ resolve(null); },1000);
-        channel.port1.onmessage=function(event){
-          clearTimeout(timeout);
-          resolve(event.data && event.data.version ? event.data.version : null);
-        };
-        controller.postMessage({type:"GET_BUILD_VERSION"},[channel.port2]);
-      });
-    }
-
-    async function report(){
-      var viewport=window.visualViewport;
-      var orientation=screen.orientation;
-      var swVersion=await serviceWorkerVersion();
-      return {
-        build:document.querySelector(".about-version").textContent.trim(),
-        displayMode:matchMedia("(display-mode: standalone)").matches || navigator.standalone===true ? "standalone" : "browser",
-        window:{innerWidth:innerWidth,innerHeight:innerHeight},
-        document:{clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight},
-        visualViewport:viewport ? {width:viewport.width,height:viewport.height,offsetTop:viewport.offsetTop,offsetLeft:viewport.offsetLeft,scale:viewport.scale} : null,
-        screen:{width:screen.width,height:screen.height,orientation:orientation ? orientation.type : "unbekannt"},
-        safeArea:{
-          top:getComputedStyle(probes.top).paddingTop,
-          right:getComputedStyle(probes.right).paddingRight,
-          bottom:getComputedStyle(probes.bottom).paddingBottom,
-          left:getComputedStyle(probes.left).paddingLeft
-        },
-        serviceWorker:{status:swVersion ? "aktiv" : "nicht aktiv",version:swVersion}
+  function serviceWorkerVersion(){
+    return new Promise(function(resolve){
+      var controller=navigator.serviceWorker && navigator.serviceWorker.controller;
+      if(!controller){ resolve(null); return; }
+      var channel=new MessageChannel();
+      var timeout=setTimeout(function(){ resolve(null); },1000);
+      channel.port1.onmessage=function(event){
+        clearTimeout(timeout);
+        resolve(event.data && event.data.version ? event.data.version : null);
       };
-    }
-
-    async function refresh(){ output.textContent=JSON.stringify(await report(),null,2); }
-    dialog.querySelector(".diagnostics-copy").addEventListener("click",function(){
-      navigator.clipboard.writeText(output.textContent).then(function(){ status.textContent="Diagnose kopiert."; },function(){ status.textContent="Kopieren nicht verfügbar."; });
+      controller.postMessage({type:"GET_BUILD_VERSION"},[channel.port2]);
     });
-    dialog.querySelector(".diagnostics-close").addEventListener("click",function(){ dialog.close(); });
-    window.addEventListener("resize",refresh);
-    window.addEventListener("orientationchange",refresh);
-    if(window.visualViewport) window.visualViewport.addEventListener("resize",refresh);
-    if(navigator.serviceWorker) navigator.serviceWorker.addEventListener("controllerchange",refresh);
-    refresh();
-    dialog.showModal();
-    dialog.querySelector(".diagnostics-copy").focus();
+  }
+
+  var diagnosticsProbes=null;
+
+  async function diagnosticsReport(){
+    var viewport=window.visualViewport;
+    var orientation=screen.orientation;
+    var swVersion=await serviceWorkerVersion();
+    var appRect=el.app.getBoundingClientRect();
+    var padButtons=Array.prototype.slice.call(el.pad.querySelectorAll("button"));
+    var lastButton=padButtons.length ? padButtons[padButtons.length-1].getBoundingClientRect() : null;
+    var runtime=viewportController ? viewportController.measure() : null;
+    function safeValue(side){ return getComputedStyle(diagnosticsProbes.safe[side])["padding"+side.charAt(0).toUpperCase()+side.slice(1)]; }
+    function unitValue(unit){ return getComputedStyle(diagnosticsProbes.units[unit]).height; }
+    return {
+      build:document.querySelector(".about-version").textContent.trim(),
+      browser:{userAgent:navigator.userAgent,platform:navigator.platform,touchPoints:navigator.maxTouchPoints || 0},
+      displayMode:matchMedia("(display-mode: standalone)").matches || navigator.standalone===true ? "standalone" : "browser",
+      window:{innerWidth:innerWidth,innerHeight:innerHeight},
+      document:{clientWidth:document.documentElement.clientWidth,clientHeight:document.documentElement.clientHeight,scrollWidth:document.documentElement.scrollWidth,scrollHeight:document.documentElement.scrollHeight},
+      visualViewport:viewport ? {width:viewport.width,height:viewport.height,offsetTop:viewport.offsetTop,offsetLeft:viewport.offsetLeft,scale:viewport.scale} : null,
+      screen:{width:screen.width,height:screen.height,availWidth:screen.availWidth,availHeight:screen.availHeight,orientation:orientation ? orientation.type : "unbekannt"},
+      cssViewportUnits:{vh:unitValue("vh"),dvh:unitValue("dvh"),svh:unitValue("svh"),lvh:unitValue("lvh")},
+      safeArea:{top:safeValue("top"),right:safeValue("right"),bottom:safeValue("bottom"),left:safeValue("left")},
+      appliedViewport:{cssVariable:getComputedStyle(document.documentElement).getPropertyValue("--app-height").trim(),measurement:runtime},
+      app:{top:appRect.top,right:appRect.right,bottom:appRect.bottom,left:appRect.left,width:appRect.width,height:appRect.height,lastButtonBottom:lastButton ? lastButton.bottom : null},
+      serviceWorker:{status:swVersion ? "aktiv" : "nicht aktiv",version:swVersion}
+    };
+  }
+
+  async function refreshDiagnostics(){
+    if(el.diagnosticsPanel.hidden) return;
+    el.diagnosticsOutput.textContent=JSON.stringify(await diagnosticsReport(),null,2);
+  }
+
+  function setDiagnosticsVisible(visible){
+    el.diagnosticsPanel.hidden=!visible;
+    el.diagnosticsToggle.setAttribute("aria-expanded",String(visible));
+    el.diagnosticsToggle.textContent=visible ? "Diagnose ausblenden" : "Diagnose anzeigen";
+    el.diagnosticsStatus.textContent="";
+    if(visible) refreshDiagnostics();
+  }
+
+  function openAbout(showDiagnostics){
+    setDiagnosticsVisible(!!showDiagnostics);
+    if(!el.aboutDialog.open) el.aboutDialog.showModal();
+    (showDiagnostics ? el.diagnosticsCopy : el.aboutClose).focus();
+  }
+
+  function copyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function(resolve,reject){
+      var textarea=document.createElement("textarea");
+      textarea.value=text;
+      textarea.setAttribute("readonly","");
+      textarea.style.position="fixed";
+      textarea.style.opacity="0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      var copied=false;
+      try{ copied=document.execCommand("copy"); }catch(error){}
+      textarea.remove();
+      if(copied) resolve(); else reject(new Error("copy unavailable"));
+    });
+  }
+
+  function setupDiagnostics(){
+    diagnosticsProbes={
+      safe:{top:createSafeProbe("safe-probe-top"),right:createSafeProbe("safe-probe-right"),bottom:createSafeProbe("safe-probe-bottom"),left:createSafeProbe("safe-probe-left")},
+      units:{vh:createViewportProbe("viewport-probe-vh"),dvh:createViewportProbe("viewport-probe-dvh"),svh:createViewportProbe("viewport-probe-svh"),lvh:createViewportProbe("viewport-probe-lvh")}
+    };
+    el.diagnosticsToggle.addEventListener("click",function(){ setDiagnosticsVisible(el.diagnosticsPanel.hidden); });
+    el.diagnosticsCopy.addEventListener("click",function(){
+      refreshDiagnostics().then(function(){ return copyText(el.diagnosticsOutput.textContent); }).then(function(){ el.diagnosticsStatus.textContent="Diagnose kopiert."; },function(){ el.diagnosticsStatus.textContent="Kopieren nicht verfügbar."; });
+    });
+    function refreshIfVisible(){ if(!el.diagnosticsPanel.hidden) refreshDiagnostics(); }
+    window.addEventListener("resize",refreshIfVisible);
+    window.addEventListener("orientationchange",refreshIfVisible);
+    if(window.visualViewport) window.visualViewport.addEventListener("resize",refreshIfVisible);
+    if(navigator.serviceWorker) navigator.serviceWorker.addEventListener("controllerchange",refreshIfVisible);
+    if(new URLSearchParams(location.search).get("diagnostics")==="1") openAbout(true);
   }
 
   restoreState(mode);
