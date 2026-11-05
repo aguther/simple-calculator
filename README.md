@@ -103,3 +103,24 @@ Worker logic is required.
 - `test/*.test.js` contains unit and build-contract tests.
 - `test/e2e/` contains the cross-browser layout, interaction, offline, and
   update scenarios.
+
+## Input stability and persistence
+
+Key animations run on an inner face so the native button hit area stays fixed.
+Touch activation still uses native clicks, including keyboard and assistive
+technology activation. The calculation tape and group totals are reused while
+only the current entry changes.
+
+Calculator state updates immediately in memory. Storage writes are batched after
+150 ms of inactivity and flushed on `pagehide` or when the document becomes
+hidden. If browser storage is unavailable, calculation continues for the current
+session. The final 150 ms may be lost if the OS terminates the process without a
+lifecycle event. Inputs are limited to 64 characters and history to 1,000 rows;
+an operation exceeding those limits is rejected with a visible status message,
+preserving the existing calculation. Existing time-field limits still apply.
+
+`test/e2e/input-stability.spec.js` covers touch at phone and tablet sizes,
+edge taps, repeated digits, cancellation event handling, rotation, simulated
+background return, unchanged tape nodes, storage errors and capacity boundaries.
+Chromium and WebKit run the touch cases; Firefox runs the remaining cases.
+These tests do not substitute for a real installed iOS PWA check.

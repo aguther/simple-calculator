@@ -373,6 +373,7 @@ button:disabled {
 .row.group-close .val-main { font-size: 17px; }
 
 .display {
+  position: relative;
   flex: 0 0 auto;
   padding: 0 12px 4px;
   text-align: right;
@@ -381,6 +382,23 @@ button:disabled {
   flex-direction: column;
   justify-content: flex-end;
 }
+
+.input-notice {
+  position: fixed;
+  top: max(62px, calc(env(safe-area-inset-top, 0px) + 62px));
+  left: 12px;
+  right: 12px;
+  pointer-events: none;
+  z-index: 1;
+  margin: 0;
+  padding: 6px;
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--amber);
+  font-size: 12px;
+  line-height: 1.3;
+}
+.input-notice:empty { display: none; }
 
 .display .pending {
   min-height: 20px;
@@ -452,81 +470,57 @@ button:disabled {
   height: clamp(52px, 8.5vh, 74px);
   height: clamp(52px, 8.5dvh, 74px);
   border: 0;
+  padding: 0;
   border-radius: 16px;
   cursor: pointer;
   font-weight: 500;
   font-size: clamp(22px, 6vw, 28px);
   color: var(--txt);
-  background: var(--key);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: transparent;
   position: relative;
-  overflow: hidden;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.28), 0 4px 0 rgba(0, 0, 0, 0.32);
-  transition: transform 0.06s ease-out, background 0.1s ease-out, filter 0.1s ease-out, box-shadow 0.1s ease-out;
-  will-change: transform, filter;
 }
 
-.pad button::after {
-  content: "";
+.key-face {
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: rgba(255, 255, 255, 0.16);
-  opacity: 0;
-  transform: scale(0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--key);
+  color: inherit;
   pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), inset 0 -1px 0 rgba(0, 0, 0, 0.28), 0 4px 0 rgba(0, 0, 0, 0.32);
+  transition: transform 0.06s ease-out, filter 0.1s ease-out;
 }
 
-.pad button:active:not(:disabled),
-.pad button.is-pressed {
+.pad button:active:not(:disabled) .key-face,
+.pad button.is-pressed .key-face {
   transform: translateY(3px) scale(0.92);
   filter: brightness(1.28) saturate(1.08);
   box-shadow: inset 0 4px 9px rgba(0, 0, 0, 0.38), 0 1px 0 rgba(0, 0, 0, 0.36), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
-.pad button.is-pressed::after {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.pad button.key-pop { animation: key-pop 0.24s cubic-bezier(0.2, 1.35, 0.35, 1); }
-.pad button.key-pop::after { animation: key-flash 0.24s ease-out; }
-
-@keyframes key-pop {
-  0% { transform: translateY(3px) scale(0.92); }
-  48% { transform: translateY(-1px) scale(1.065); }
-  72% { transform: scale(0.985); }
-  100% { transform: scale(1); }
-}
-
-@keyframes key-flash {
-  0% { opacity: 0.55; transform: scale(0.74); }
-  100% { opacity: 0; transform: scale(1.18); }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .pad button { transition: filter 0.1s ease-out, box-shadow 0.1s ease-out; }
-  .pad button:active:not(:disabled),
-  .pad button.is-pressed {
-    transform: none;
-    filter: brightness(1.2);
-    box-shadow: inset 0 3px 8px rgba(0, 0, 0, 0.28);
-  }
-  .pad button.key-pop,
-  .pad button.key-pop::after { animation: none; }
+  .key-face { transition: filter 0.1s ease-out; }
+  .pad button:active:not(:disabled) .key-face,
+  .pad button.is-pressed .key-face { transform: none; }
 }
 
 .pad .fn { color: var(--muted); }
-.pad .clear { background: #3a201d; color: var(--red); font-weight: 700; }
-.pad .clear-soft { background: var(--key); color: var(--red); font-weight: 700; }
-.pad .op { background: var(--amber-soft); color: var(--amber); font-weight: 600; }
-.pad .op.armed { background: var(--amber); color: #1b1206; }
-.pad .eq { background: #4f9d61; color: #0c1a0f; font-weight: 700; }
+.pad .clear { color: var(--red); font-weight: 700; }
+.pad .clear .key-face { background: #3a201d; }
+.pad .clear-soft { color: var(--red); font-weight: 700; }
+.pad .op { color: var(--amber); font-weight: 600; }
+.pad .op .key-face { background: var(--amber-soft); }
+.pad .op.armed { color: #1b1206; }
+.pad .op.armed .key-face { background: var(--amber); }
+.pad .eq { color: #0c1a0f; font-weight: 700; }
+.pad .eq .key-face { background: #4f9d61; }
 .pad .wide { grid-column: span 2; }
 .pad .colon { font-size: clamp(22px, 5.6vw, 26px); }
-.pad .colon.armed { background: var(--amber-soft); color: var(--amber); }
+.pad .colon.armed { color: var(--amber); }
+.pad .colon.armed .key-face { background: var(--amber-soft); }
 
 .about-dialog {
   border: 0;

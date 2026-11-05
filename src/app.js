@@ -4,8 +4,15 @@
   var viewportController=window.CalculatorViewport ? window.CalculatorViewport.install(window,document) : null;
   var core=window.CalculatorCore;
   var stateStore=window.CalculatorStateStore;
-  var loaded=stateStore.load(localStorage);
-  var settings=stateStore.loadSettings(localStorage);
+  var storage=null;
+  try{ storage=window.localStorage; }catch(e){}
+  var loaded=stateStore.load(storage);
+  var settings=stateStore.loadSettings(storage);
+  var persistTimer=null;
+  var persistPending=false;
+  var renderedMode=null;
+  var renderedSteps=[];
+  var renderedTotal=0;
 
   var mode=loaded.mode;
   var saved=loaded.saved;
@@ -25,6 +32,7 @@
     sumMinutes:document.getElementById("sumMinutes"),
     pending:document.getElementById("pending"),
     current:document.getElementById("current"),
+    inputNotice:document.getElementById("inputNotice"),
     pad:document.getElementById("pad"),
     undo:document.getElementById("undo"),
     modebar:document.getElementById("modebar"),
@@ -61,21 +69,44 @@
     error=state.error || null;
   }
 
+  function flushPersist(){
+    if(persistTimer!==null) window.clearTimeout(persistTimer);
+    persistTimer=null;
+    if(!persistPending) return;
+    persistPending=false;
+    try{ stateStore.save(storage,{version:5,mode:mode,saved:saved}); }catch(e){}
+  }
+
   function persist(){
     captureState();
-    try{
-      var clean=stateStore.save(localStorage,{version:5,mode:mode,saved:saved});
-      saved=clean.saved;
-    }catch(e){}
+    persistPending=true;
+    if(persistTimer!==null) window.clearTimeout(persistTimer);
+    persistTimer=window.setTimeout(flushPersist,150);
+  }
+
+  window.addEventListener("pagehide",flushPersist);
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="hidden") flushPersist();
+  });
+
+  function rejectInput(message){
+    el.inputNotice.textContent=message;
+    return false;
+  }
+
+  function hasHistoryRoom(additional,startingFresh){
+    if((startingFresh ? 0 : steps.length)+additional<=1000) return true;
+    return rejectInput("Maximal 1.000 Verlaufseinträge. Bitte Eingabe löschen oder einen Schritt zurückgehen.");
   }
 
   function persistSettings(){
     try{
-      settings=stateStore.saveSettings(localStorage,{clickSoundEnabled:clickSoundEnabled,historySide:historySide});
+      settings=stateStore.saveSettings(storage,{clickSoundEnabled:clickSoundEnabled,historySide:historySide});
     }catch(e){}
   }
 
   function completeChange(){
+    el.inputNotice.textContent="";
     render();
     persist();
   }
@@ -125,17 +156,22 @@
 
   function pressKeyVisual(button){
     if(button.disabled) return;
-    button.classList.remove("key-pop");
+    var face=button.firstElementChild;
+    if(face.getAnimations) face.getAnimations().forEach(function(animation){ animation.cancel(); });
     button.classList.add("is-pressed");
   }
 
   function releaseKeyVisual(button){
     if(!button.classList.contains("is-pressed")) return;
     button.classList.remove("is-pressed");
-    button.classList.remove("key-pop");
-    void button.offsetWidth;
-    button.classList.add("key-pop");
-    window.setTimeout(function(){ button.classList.remove("key-pop"); },260);
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    var face=button.firstElementChild;
+    if(face.animate) face.animate([
+      {transform:"translateY(3px) scale(0.92)"},
+      {transform:"translateY(-1px) scale(1.065)",offset:0.48},
+      {transform:"scale(0.985)",offset:0.72},
+      {transform:"scale(1)"}
+    ],{duration:240,easing:"ease-out"});
   }
 
   function expressionSteps(){ return core.expressionSteps(steps); }
@@ -273,8 +309,15 @@
   }
 
   function render(){
-    renderTape();
-    var totalValue=evaluate();
+    var historyChanged=renderedMode!==mode || renderedSteps.length!==steps.length ||
+      steps.some(function(step,index){ return step!==renderedSteps[index]; });
+    if(historyChanged){
+      renderTape();
+      renderedTotal=evaluate();
+      renderedMode=mode;
+      renderedSteps=steps.slice();
+    }
+    var totalValue=renderedTotal;
     el.sum.textContent=valueLabel(totalValue);
     el.sumMinutes.textContent=mode==="time" ? core.fmtMinutes(totalValue) : "";
     el.sum.classList.toggle("compact",el.sum.textContent.length>7);
@@ -342,6 +385,9 @@
   }
 
   function pressDigit(digit){
+    if(mode==="num" && !error && !lastEntryWasResult && entry.length>=64 && !(entry==="0" && digit!=="." && digit!==",")){
+      return rejectInput("Maximal 64 Zeichen pro Eingabe. Bitte die letzte Stelle löschen.");
+    }
     if(error || lastEntryWasResult) resetForNewExpression();
     if(!canStartValue()) return false;
     if(mode==="time"){
@@ -372,6 +418,9 @@
       completeChange();
       return true;
     }
+    var before=lastExprStep();
+    var additional=entry!=="" || !before || (before.type==="paren" && before.value==="(" && op==="-") ? 1 : 0;
+    if(!hasHistoryRoom(additional)) return false;
     if(entry!=="") commitEntry();
     var last=lastExprStep();
     if(!last) commitEntry(0);
@@ -388,6 +437,7 @@
 
   function pressEquals(){
     if(!canEqual()) return false;
+    if(!hasHistoryRoom((entry!=="" ? 1 : 0)+1)) return false;
     if(entry!=="") commitEntry();
     var result=evaluate();
     if(!Number.isFinite(result)){
@@ -417,6 +467,7 @@
 
   function pressOpenParen(){
     if(error) return false;
+    if(!hasHistoryRoom((!lastEntryWasResult && entry!=="" ? 1 : 0)+1,lastEntryWasResult)) return false;
     if(lastEntryWasResult) resetForNewExpression();
     if(entry!=="") commitEntry();
     var last=lastExprStep();
@@ -431,6 +482,7 @@
 
   function pressCloseParen(){
     if(!canCloseParen()) return false;
+    if(!hasHistoryRoom((entry!=="" ? 1 : 0)+1)) return false;
     if(entry!=="") commitEntry();
     steps.push({type:"paren",value:")"});
     pendingOp=null;
@@ -507,7 +559,10 @@
       row.forEach(function(key){
         var button=document.createElement("button");
         button.type="button";
-        button.textContent=key.t;
+        var face=document.createElement("span");
+        face.className="key-face";
+        face.textContent=key.t;
+        button.appendChild(face);
         button.dataset.action=key.a;
         if(key.c) button.className=key.c;
         if(key.wide) button.classList.add("wide");
