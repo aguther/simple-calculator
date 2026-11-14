@@ -464,8 +464,6 @@
     Array.prototype.forEach.call(el.pad.querySelectorAll(".op"),function(button){
       button.classList.toggle("armed",!error && button.dataset.op===pendingOp);
     });
-    var colonButton=el.pad.querySelector(".colon");
-    if(colonButton && mode==="time") colonButton.classList.toggle("armed",!error && entry.includes(":"));
     var equalsButton=el.pad.querySelector('[data-action="eq"]');
     if(equalsButton) equalsButton.disabled=!canEqual();
     el.undo.disabled=!error && entry==="" && !pendingOp && steps.length===0;
