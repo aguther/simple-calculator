@@ -157,6 +157,7 @@
   function pressKeyVisual(button){
     if(button.disabled) return;
     var face=button.firstElementChild;
+    if(!face || !face.classList.contains("key-face")) return;
     if(face.getAnimations) face.getAnimations().forEach(function(animation){ animation.cancel(); });
     button.classList.add("is-pressed");
   }
@@ -166,12 +167,137 @@
     button.classList.remove("is-pressed");
     if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     var face=button.firstElementChild;
-    if(face.animate) face.animate([
+    if(face && face.animate) face.animate([
       {transform:"translateY(3px) scale(0.92)"},
       {transform:"translateY(-1px) scale(1.065)",offset:0.48},
       {transform:"scale(0.985)",offset:0.72},
       {transform:"scale(1)"}
     ],{duration:240,easing:"ease-out"});
+  }
+
+  // Keep only event metadata in memory; never record keys or calculation contents.
+  var inputEvents=[];
+  var inputCounts={};
+  var contacts=new Map();
+  var recentContacts=[];
+
+  function recordInput(type,event,control,accepted,reason){
+    inputCounts[type]=(inputCounts[type] || 0)+1;
+    if(accepted===false && reason==="logic-rejected") inputCounts.rejected=(inputCounts.rejected || 0)+1;
+    if(reason==="duplicate-click" || reason==="missing-contact") inputCounts.suppressed=(inputCounts.suppressed || 0)+1;
+    var item={type:type,time:Math.round(performance.now()),control:control};
+    if(event){
+      item.pointerId=event.pointerId===undefined ? null : event.pointerId;
+      item.pointerType=event.pointerType || "";
+      item.primary=!!event.isPrimary;
+    }
+    if(accepted!==undefined) item.accepted=accepted;
+    if(reason) item.reason=reason;
+    inputEvents.push(item);
+    if(inputEvents.length>120) inputEvents.shift();
+  }
+
+  function rememberContact(contact,id){
+    recentContacts.push({button:contact.button,id:id,time:performance.now()});
+    if(recentContacts.length>32) recentContacts.shift();
+  }
+
+  function releaseContactVisual(button){
+    var stillPressed=false;
+    contacts.forEach(function(contact){ if(contact.button===button) stillPressed=true; });
+    if(!stillPressed) releaseKeyVisual(button);
+  }
+
+  function cancelContacts(reason){
+    contacts.forEach(function(contact,id){
+      rememberContact(contact,id);
+      recordInput("abort",null,contact.control,false,reason);
+      releaseKeyVisual(contact.button);
+    });
+    contacts.clear();
+  }
+
+  function contactMoved(contact,event){
+    var dx=event.clientX-contact.x;
+    var dy=event.clientY-contact.y;
+    if(dx*dx+dy*dy>144) contact.dragged=true;
+  }
+
+  function finishContact(event){
+    var contact=contacts.get(event.pointerId);
+    if(!contact) return;
+    contacts.delete(event.pointerId);
+    rememberContact(contact,event.pointerId);
+    releaseContactVisual(contact.button);
+    contactMoved(contact,event);
+    var reason=null;
+    if(event.type==="pointercancel") reason="canceled";
+    else if(contact.dragged) reason="dragged";
+    else if(!contact.button.isConnected || contact.button.disabled || el.aboutDialog.open) reason="unavailable";
+    else{
+      var rect=contact.button.getBoundingClientRect();
+      if(event.clientX<rect.left-8 || event.clientX>rect.right+8 || event.clientY<rect.top-8 || event.clientY>rect.bottom+8) reason="outside";
+    }
+    var accepted=false;
+    if(!reason){
+      accepted=contact.activate()===true;
+      if(accepted) feedback();
+      else reason="logic-rejected";
+    }
+    recordInput(event.type,event,contact.control,accepted,reason);
+  }
+
+  document.addEventListener("pointermove",function(event){
+    var contact=contacts.get(event.pointerId);
+    if(!contact) return;
+    contactMoved(contact,event);
+    recordInput("pointermove",event,contact.control);
+  },true);
+  document.addEventListener("pointerup",finishContact,true);
+  document.addEventListener("pointercancel",finishContact,true);
+  window.addEventListener("pagehide",function(){ cancelContacts("pagehide"); });
+  window.addEventListener("blur",function(){ cancelContacts("blur"); });
+  document.addEventListener("visibilitychange",function(){
+    if(document.visibilityState==="hidden") cancelContacts("hidden");
+  });
+
+  function bindInput(button,control,activate){
+    var lastMouseDown=-Infinity;
+    button.addEventListener("pointerdown",function(event){
+      if(button.disabled || el.aboutDialog.open) return;
+      pressKeyVisual(button);
+      if(event.pointerType!=="touch" && event.pointerType!=="pen"){
+        lastMouseDown=performance.now();
+        return;
+      }
+      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,dragged:false});
+      recordInput("pointerdown",event,control);
+      try{ button.setPointerCapture(event.pointerId); }catch(error){}
+    });
+    button.addEventListener("pointerup",function(){ releaseContactVisual(button); });
+    button.addEventListener("pointercancel",function(){ releaseContactVisual(button); });
+    button.addEventListener("pointerleave",function(){ releaseContactVisual(button); });
+    button.addEventListener("lostpointercapture",function(event){
+      if(contacts.has(event.pointerId)){
+        finishContact({type:"pointercancel",pointerId:event.pointerId,pointerType:event.pointerType,isPrimary:event.isPrimary,clientX:event.clientX,clientY:event.clientY});
+      }
+    });
+    button.addEventListener("click",function(event){
+      var direct=event.pointerType==="touch" || event.pointerType==="pen" || !!(event.sourceCapabilities && event.sourceCapabilities.firesTouchEvents);
+      // WebKit can label a touch-generated click as mouse without a mouse pointerdown.
+      var legacy=!direct && event.detail>0 && recentContacts.some(function(contact){
+        return contact.button===button && contact.time>lastMouseDown && performance.now()-contact.time<800;
+      });
+      if(direct || legacy){
+        event.preventDefault();
+        var known=legacy || recentContacts.some(function(contact){ return contact.id===event.pointerId && performance.now()-contact.time<1500; });
+        recordInput("click",event,control,false,known ? "duplicate-click" : "missing-contact");
+        return;
+      }
+      var accepted=activate()===true;
+      if(accepted) feedback();
+      recordInput("click",event,control,accepted,accepted ? null : "logic-rejected");
+    });
   }
 
   function expressionSteps(){ return core.expressionSteps(steps); }
@@ -568,19 +694,15 @@
         if(key.wide) button.classList.add("wide");
         if(key.op) button.dataset.op=key.op;
         button.setAttribute("aria-label",key.label || key.t);
-        button.addEventListener("pointerdown",function(){ pressKeyVisual(button); });
-        button.addEventListener("pointerup",function(){ releaseKeyVisual(button); });
-        button.addEventListener("pointercancel",function(){ releaseKeyVisual(button); });
-        button.addEventListener("pointerleave",function(){ releaseKeyVisual(button); });
-        button.addEventListener("click",function(){
-          feedback();
-          if(key.a==="d") pressDigit(key.t);
-          else if(key.a==="op") pressOp(key.op);
-          else if(key.a==="eq") pressEquals();
-          else if(key.a==="back") backspace();
-          else if(key.a==="allclear") clearAll();
-          else if(key.a==="clear") clearEntry();
-          else if(key.a==="sep") mode==="num" ? pressDigit(".") : pressColonTime();
+        bindInput(button,key.a==="d" ? "digit" : key.a==="op" ? "operator" : key.a,function(){
+          if(key.a==="d") return pressDigit(key.t);
+          if(key.a==="op") return pressOp(key.op);
+          if(key.a==="eq") return pressEquals();
+          if(key.a==="back") return backspace();
+          if(key.a==="allclear") return clearAll();
+          if(key.a==="clear") return clearEntry();
+          if(key.a==="sep") return mode==="num" ? pressDigit(".") : pressColonTime();
+          return false;
         });
         el.pad.appendChild(button);
       });
@@ -589,6 +711,7 @@
 
   function setMode(nextMode){
     if(nextMode===mode) return false;
+    cancelContacts("mode-change");
     captureState();
     mode=nextMode;
     restoreState(mode);
@@ -602,15 +725,12 @@
     return true;
   }
 
-  el.modebar.addEventListener("click",function(event){
-    var button=event.target.closest(".modetab");
-    if(!button) return;
-    feedback();
-    setMode(button.dataset.mode);
+  Array.prototype.forEach.call(el.modebar.querySelectorAll(".modetab"),function(button){
+    bindInput(button,"mode",function(){ return setMode(button.dataset.mode); });
   });
-  el.undo.addEventListener("click",function(){ feedback(); undo(); });
-  el.openParen.addEventListener("click",function(){ feedback(); pressOpenParen(); });
-  el.closeParen.addEventListener("click",function(){ feedback(); pressCloseParen(); });
+  bindInput(el.undo,"undo",undo);
+  bindInput(el.openParen,"open-group",pressOpenParen);
+  bindInput(el.closeParen,"close-group",pressCloseParen);
 
   el.infoBtn.addEventListener("click",function(){ feedback(); openAbout(false); });
   el.aboutClose.addEventListener("click",function(){ feedback(); el.aboutDialog.close(); });
@@ -688,6 +808,7 @@
     function safeValue(side){ return getComputedStyle(diagnosticsProbes.safe[side])["padding"+side.charAt(0).toUpperCase()+side.slice(1)]; }
     function unitValue(unit){ return getComputedStyle(diagnosticsProbes.units[unit]).height; }
     return {
+      input:{counts:Object.assign({},inputCounts),events:inputEvents.slice(),activeContacts:contacts.size},
       build:document.querySelector(".about-version").textContent.trim(),
       browser:{userAgent:navigator.userAgent,platform:navigator.platform,touchPoints:navigator.maxTouchPoints || 0},
       displayMode:matchMedia("(display-mode: standalone)").matches || navigator.standalone===true ? "standalone" : "browser",
