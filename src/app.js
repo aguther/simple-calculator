@@ -181,10 +181,11 @@
   var contacts=new Map();
   var recentContacts=[];
 
-  function recordInput(type,event,control,accepted,reason,maxDistance){
+  function recordInput(type,event,control,accepted,reason,maxDistance,gesture){
     inputCounts[type]=(inputCounts[type] || 0)+1;
     if(accepted===false && reason==="logic-rejected") inputCounts.rejected=(inputCounts.rejected || 0)+1;
     if(reason==="duplicate-click" || reason==="missing-contact") inputCounts.suppressed=(inputCounts.suppressed || 0)+1;
+    if(type==="pointermove") return;
     var item={type:type,time:Math.round(performance.now()),control:control};
     if(event){
       item.pointerId=event.pointerId===undefined ? null : event.pointerId;
@@ -194,6 +195,7 @@
     if(accepted!==undefined) item.accepted=accepted;
     if(reason) item.reason=reason;
     if(maxDistance!==undefined) item.maxDistance=Math.round(maxDistance);
+    if(gesture) item.gesture=gesture;
     inputEvents.push(item);
     if(inputEvents.length>120) inputEvents.shift();
   }
@@ -249,20 +251,31 @@
     return {left:rect.left-left,right:rect.right+right,top:rect.top-top,bottom:rect.bottom+bottom};
   }
 
-  function finishContact(event){
+  function roundInputOffset(value){ return Math.round(value*100)/100; }
+
+  function finishContact(event,cancelReason){
     if(event.pointerType!=="touch" && event.pointerType!=="pen") return;
     var contact=contacts.get(event.pointerId);
     if(!contact) return;
     contacts.delete(event.pointerId);
     rememberContact(contact,event.pointerId);
     releaseContactVisual(contact.button);
-    if(event.type==="pointerup") contactMoved(contact,event);
+    var gesture={durationMs:Math.max(0,Math.round(performance.now()-contact.startedAt))};
+    if(event.type==="pointerup"){
+      contactMoved(contact,event);
+      gesture.deltaX=roundInputOffset(event.clientX-contact.x);
+      gesture.deltaY=roundInputOffset(event.clientY-contact.y);
+    }
     var reason=null;
-    if(event.type==="pointercancel") reason="canceled";
+    if(event.type==="pointercancel") reason=cancelReason || "canceled";
     else if(!contact.button.isConnected || contact.button.disabled || el.aboutDialog.open) reason="unavailable";
     else{
       var rect=releaseBounds(contact.button);
-      if(event.clientX<rect.left || event.clientX>rect.right || event.clientY<rect.top || event.clientY>rect.bottom) reason="outside";
+      var outsideX=Math.min(0,event.clientX-rect.left)+Math.max(0,event.clientX-rect.right);
+      var outsideY=Math.min(0,event.clientY-rect.top)+Math.max(0,event.clientY-rect.bottom);
+      gesture.outsideX=roundInputOffset(outsideX);
+      gesture.outsideY=roundInputOffset(outsideY);
+      if(outsideX!==0 || outsideY!==0) reason="outside";
     }
     var accepted=false;
     if(!reason){
@@ -270,7 +283,7 @@
       if(accepted) feedback();
       else reason="logic-rejected";
     }
-    recordInput(event.type,event,contact.control,accepted,reason,contact.maxDistance);
+    recordInput(event.type,event,contact.control,accepted,reason,contact.maxDistance,gesture);
   }
 
   document.addEventListener("pointermove",function(event){
@@ -297,7 +310,7 @@
         lastMouseDown=performance.now();
         return;
       }
-      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,maxDistance:0});
+      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,maxDistance:0,startedAt:performance.now()});
       recordInput("pointerdown",event,control);
       try{ button.setPointerCapture(event.pointerId); }catch(error){}
     });
@@ -306,7 +319,7 @@
     button.addEventListener("pointerleave",function(){ releaseContactVisual(button); });
     button.addEventListener("lostpointercapture",function(event){
       if(contacts.has(event.pointerId)){
-        finishContact({type:"pointercancel",pointerId:event.pointerId,pointerType:event.pointerType,isPrimary:event.isPrimary,clientX:event.clientX,clientY:event.clientY});
+        finishContact({type:"pointercancel",pointerId:event.pointerId,pointerType:event.pointerType,isPrimary:event.isPrimary,clientX:event.clientX,clientY:event.clientY},"capture-lost");
       }
     });
     button.addEventListener("click",function(event){

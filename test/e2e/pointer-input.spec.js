@@ -127,6 +127,49 @@ test.describe("pointer input", () => {
     await expect(page.locator("#current")).toHaveText("700");
   });
 
+  test("retains contact boundaries through many moves and reports release direction and duration", async ({page}) => {
+    await page.clock.install();
+    await page.clock.pauseAt(new Date(Date.now()+1000));
+    const button=digit(page,"5");
+    const box=await clientBox(button);
+    const start={pointerId:501,pointerType:"touch",clientX:box.x+box.width/2,clientY:box.y+box.height/2};
+    await button.dispatchEvent("pointerdown",start);
+    await button.evaluate((element,start) => {
+      for(let i=0;i<200;i++) element.dispatchEvent(new PointerEvent("pointermove",{...start,bubbles:true,clientX:start.clientX+1}));
+    },start);
+    await page.clock.runFor(40);
+    await button.dispatchEvent("pointerup",{...start,clientX:start.clientX+7,clientY:start.clientY+4});
+    await expect(page.locator("#current")).toHaveText("5");
+    const input=await report(page);
+    expect(input.counts.pointermove).toBe(200);
+    expect(input.events.some(event => event.type==="pointermove")).toBe(false);
+    expect(input.events).toContainEqual(expect.objectContaining({type:"pointerdown",pointerId:501}));
+    const release=input.events.find(event => event.type==="pointerup" && event.pointerId===501);
+    expect(release.gesture).toEqual({durationMs:40,deltaX:7,deltaY:4,outsideX:0,outsideY:0});
+  });
+
+  test("identifies vertical overrun without recording absolute coordinates", async ({page}) => {
+    const button=digit(page,"5");
+    const box=await clientBox(button);
+    const below=await clientBox(digit(page,"2"));
+    const start={pointerId:502,pointerType:"touch",clientX:box.x+box.width/2,clientY:box.y+box.height/2};
+    await button.dispatchEvent("pointerdown",start);
+    await button.dispatchEvent("pointerup",{...start,clientY:below.y+below.height+3});
+    await expect(page.locator("#current")).toHaveText("0");
+    const input=await report(page);
+    const release=input.events.find(event => event.type==="pointerup" && event.pointerId===502);
+    expect(release).toMatchObject({accepted:false,reason:"outside",gesture:{deltaX:0,outsideX:0,outsideY:3}});
+    expect(Object.keys(release.gesture).sort()).toEqual(["deltaX","deltaY","durationMs","outsideX","outsideY"]);
+  });
+
+  test("distinguishes lost pointer capture from browser cancellation", async ({page}) => {
+    await pointer(page,"5","pointerdown",503);
+    await digit(page,"5").dispatchEvent("lostpointercapture",{pointerId:503,pointerType:"touch"});
+    await expect(page.locator("#current")).toHaveText("0");
+    const input=await report(page);
+    expect(input.events).toContainEqual(expect.objectContaining({type:"pointercancel",pointerId:503,reason:"capture-lost",accepted:false}));
+  });
+
   test("handles native overlapping touches and returns while retaining history scrolling", async ({page,context,browserName}) => {
     test.skip(browserName!=="chromium", "Native multitouch injection requires Chromium CDP; pointer sequences run in all engines.");
     const session=await context.newCDPSession(page);
@@ -283,7 +326,7 @@ test.describe("pointer input", () => {
       expect.objectContaining({type:"pointercancel",reason:"canceled"})
     ]));
     for(const event of input.events) {
-      expect(Object.keys(event).every(key => ["type","time","pointerId","pointerType","primary","control","accepted","reason","maxDistance"].includes(key))).toBe(true);
+      expect(Object.keys(event).every(key => ["type","time","pointerId","pointerType","primary","control","accepted","reason","maxDistance","gesture"].includes(key))).toBe(true);
     }
   });
 

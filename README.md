@@ -74,11 +74,19 @@ app-build, and active service-worker-version information. It contains no stored
 calculator data or personal information and does not change persisted state.
 
 The `input` section includes event counters, active touch/pen contacts, and the
-last 120 input events in this page session. It records event type, relative time,
-contact ID/type, a generic control category, acceptance, and rejection/cancellation
-reason. Movement/release events also include `maxDistance`, the rounded maximum
-distance from the initial contact in CSS pixels. It never includes key values,
-absolute coordinates, or calculation contents and is
+last 120 non-movement input events in this page session. Movement events are
+counted and summarized by the maximum distance at the end of each contact,
+so swipes do not evict contact beginnings and endings. It records event type,
+relative time, contact ID/type, a generic control category, acceptance, and rejection/cancellation
+reason. Contact endings also include `maxDistance`, the rounded maximum distance
+from the initial contact in CSS pixels. The `gesture` object records `durationMs`;
+releases additionally record `deltaX`/`deltaY` relative to the initial contact and,
+when release bounds can be checked, `outsideX`/`outsideY` beyond those bounds.
+Negative offsets indicate left/up, positive offsets right/down; zero outside
+offset means within the bounds. Offsets are rounded to hundredths of a CSS pixel.
+`capture-lost` distinguishes lost pointer capture from a browser cancellation.
+The report never includes key values, absolute coordinates, or calculation
+contents and is
 neither persisted nor transmitted. Reloading clears it. After a missed input,
 open Information and Settings, show diagnostics, and copy the JSON before reloading.
 `logic-rejected` means the calculator rejected the action; `duplicate-click` means
