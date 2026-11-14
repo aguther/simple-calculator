@@ -60,7 +60,45 @@ test.describe("pointer input", () => {
     }
   });
 
-  test("handles browser-generated overlapping touches with slight movement", async ({page,context,browserName}) => {
+  test("accepts return to the original key after leaving it", async ({page}) => {
+    const box=await digit(page,"7").boundingBox();
+    await pointer(page,"7","pointerdown",71);
+    await pointer(page,"7","pointermove",71,box.width,0);
+    await pointer(page,"7","pointermove",71,0,0);
+    await pointer(page,"7","pointerup",71);
+    await digit(page,"8").evaluate(button => button.dispatchEvent(new PointerEvent("click",{bubbles:true,pointerType:"mouse",pointerId:71,detail:1})));
+    await expect(page.locator("#current")).toHaveText("7");
+    const input=await report(page);
+    expect(input.events).toContainEqual(expect.objectContaining({type:"pointerup",pointerId:71,accepted:true,maxDistance:Math.round(box.width)}));
+  });
+
+  test("accepts release within the larger margin on every edge but rejects release beyond it", async ({page}) => {
+    const button=digit(page,"7");
+    const box=await button.boundingBox();
+    const x=box.x+box.width/2;
+    const y=box.y+box.height/2;
+    const edges=[
+      {clientX:box.x-16,clientY:y,outside:{clientX:box.x-17,clientY:y}},
+      {clientX:box.x+box.width+16,clientY:y,outside:{clientX:box.x+box.width+17,clientY:y}},
+      {clientX:x,clientY:box.y-16,outside:{clientX:x,clientY:box.y-17}},
+      {clientX:x,clientY:box.y+box.height+16,outside:{clientX:x,clientY:box.y+box.height+17}}
+    ];
+    let pointerId=100;
+    for(const edge of edges) {
+      const start={pointerType:"touch",pointerId:pointerId++,clientX:x,clientY:y};
+      await button.dispatchEvent("pointerdown",start);
+      await button.dispatchEvent("pointerup",{...start,clientX:edge.clientX,clientY:edge.clientY});
+      const outside={...start,pointerId:pointerId++};
+      await button.dispatchEvent("pointerdown",outside);
+      await button.dispatchEvent("pointerup",{...outside,...edge.outside});
+    }
+    await expect(page.locator("#current")).toHaveText("7 777");
+    const input=await report(page);
+    expect(input.events.filter(event => event.type==="pointerup" && event.accepted)).toHaveLength(4);
+    expect(input.events.filter(event => event.type==="pointerup" && event.reason==="outside")).toHaveLength(4);
+  });
+
+  test("handles native overlapping touches and returns while retaining history scrolling", async ({page,context,browserName}) => {
     test.skip(browserName!=="chromium", "Native multitouch injection requires Chromium CDP; pointer sequences run in all engines.");
     const session=await context.newCDPSession(page);
     await session.send("Emulation.setTouchEmulationEnabled",{enabled:true,maxTouchPoints:2});
@@ -75,6 +113,32 @@ test.describe("pointer input", () => {
     await expect(page.locator("#current")).toHaveText("1");
     await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
     await expect(page.locator("#current")).toHaveText("12");
+    const key=await digit(page,"7").boundingBox();
+    const returning={id:3,x:key.x+key.width/2,y:key.y+key.height/2};
+    await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[returning]});
+    await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{...returning,x:returning.x+key.width}]});
+    await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[returning]});
+    await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+    const nativeReport=await report(page);
+    expect(nativeReport.events.filter(event => event.type==="pointercancel")).toEqual([]);
+    await expect(page.locator("#current")).toHaveText("127");
+    await page.locator("#aboutClose").click();
+    await page.evaluate(() => {
+      const key=document.querySelector('#pad button[aria-label="1"]');
+      const add=document.querySelector('#pad button[data-op="+"]');
+      for(let i=0;i<50;i++) { key.click(); add.click(); }
+    });
+    const tape=page.locator("#tape");
+    const before=await tape.evaluate(element => element.scrollTop);
+    expect(before).toBeGreaterThan(0);
+    const tapeBox=await tape.boundingBox();
+    const scrolling={id:4,x:tapeBox.x+tapeBox.width/2,y:tapeBox.y+30};
+    await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[scrolling]});
+    for(const offset of [30,60,90,120]) {
+      await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{...scrolling,y:scrolling.y+offset}]});
+    }
+    await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
+    await expect.poll(() => tape.evaluate(element => element.scrollTop)).toBeLessThan(before);
     await session.detach();
   });
 
@@ -108,7 +172,7 @@ test.describe("pointer input", () => {
     await pointer(page,"8","pointerdown",2);
     const box=await digit(page,"8").boundingBox();
     await pointer(page,"8","pointermove",2,box.width,0);
-    await pointer(page,"8","pointerup",2);
+    await pointer(page,"8","pointerup",2,box.width,0);
     await expect(page.locator("#current")).toHaveText("0");
     await pointer(page,"9","pointerdown",3);
     await pointer(page,"9","pointerup",3);
@@ -144,7 +208,7 @@ test.describe("pointer input", () => {
     await button.dispatchEvent("pointerup",{...start,clientX:box.x-3});
     await expect(page.locator("#current")).toHaveText("7");
     await button.dispatchEvent("pointerdown",{...start,pointerId:2});
-    await button.dispatchEvent("pointerup",{...start,pointerId:2,clientX:box.x-9});
+    await button.dispatchEvent("pointerup",{...start,pointerId:2,clientX:box.x-17});
     await expect(page.locator("#current")).toHaveText("7");
   });
 

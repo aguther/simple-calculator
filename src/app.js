@@ -222,8 +222,6 @@
     var dx=event.clientX-contact.x;
     var dy=event.clientY-contact.y;
     contact.maxDistance=Math.max(contact.maxDistance,Math.sqrt(dx*dx+dy*dy));
-    var rect=contact.bounds;
-    if(event.clientX<rect.left-8 || event.clientX>rect.right+8 || event.clientY<rect.top-8 || event.clientY>rect.bottom+8) contact.dragged=true;
   }
 
   function finishContact(event){
@@ -236,11 +234,10 @@
     if(event.type==="pointerup") contactMoved(contact,event);
     var reason=null;
     if(event.type==="pointercancel") reason="canceled";
-    else if(contact.dragged) reason="dragged";
     else if(!contact.button.isConnected || contact.button.disabled || el.aboutDialog.open) reason="unavailable";
     else{
       var rect=contact.button.getBoundingClientRect();
-      if(event.clientX<rect.left-8 || event.clientX>rect.right+8 || event.clientY<rect.top-8 || event.clientY>rect.bottom+8) reason="outside";
+      if(event.clientX<rect.left-16 || event.clientX>rect.right+16 || event.clientY<rect.top-16 || event.clientY>rect.bottom+16) reason="outside";
     }
     var accepted=false;
     if(!reason){
@@ -275,7 +272,7 @@
         lastMouseDown=performance.now();
         return;
       }
-      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,bounds:button.getBoundingClientRect(),maxDistance:0,dragged:false});
+      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,maxDistance:0});
       recordInput("pointerdown",event,control);
       try{ button.setPointerCapture(event.pointerId); }catch(error){}
     });

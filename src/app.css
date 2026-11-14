@@ -62,6 +62,19 @@ button {
   touch-action: manipulation;
 }
 
+/* Permit history scrolling without pinch gestures taking over the calculator. */
+body {
+  touch-action: pan-y;
+}
+
+/* Keep held calculator keys active throughout return and multi-touch gestures. */
+.pad button,
+.parenbar button,
+.modebar .modetab,
+.undo {
+  touch-action: none;
+}
+
 button:focus-visible,
 input:focus-visible + .sound-slider,
 .side-options input:focus-visible + label {

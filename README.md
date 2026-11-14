@@ -83,13 +83,18 @@ neither persisted nor transmitted. Reloading clears it. After a missed input,
 open Information and Settings, show diagnostics, and copy the JSON before reloading.
 `logic-rejected` means the calculator rejected the action; `duplicate-click` means
 a follow-up click was intentionally suppressed. `missing-contact` indicates a
-click without a matching recently completed contact. `dragged`, `outside`, and
-`canceled` distinguish discarded gestures.
+click without a matching recently completed contact. `outside` means release
+beyond the key margin; `canceled` indicates an aborted gesture.
 
 Touch and pen actions commit on release, including overlapping contacts in release
-order. Movement within the original key is tolerated, including an 8-pixel margin
-around its bounds. Leaving that area cancels the gesture even if the finger
-returns. Browser gesture cancellation, lost capture, mode changes, backgrounding,
+order. The release position is checked against the original key with a 16-pixel margin
+around its current bounds. Leaving the key while holding a finger down does not
+cancel the contact: returning before release activates the original key once.
+Releasing beyond the margin discards the contact. Calculator controls disable
+browser panning and zoom gestures so return and multi-touch input remain
+available. The calculation tape retains vertical scrolling; touch zoom is
+disabled in the calculator interface. Browser gesture cancellation, lost capture,
+mode changes, backgrounding,
 and window focus loss discard unfinished contacts. Mouse and keyboard activation
 remain available through click events; touch-generated clicks are deduplicated.
 Recently completed contact IDs suppress follow-up clicks even when iOS labels
