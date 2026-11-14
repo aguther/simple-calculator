@@ -76,7 +76,9 @@ calculator data or personal information and does not change persisted state.
 The `input` section includes event counters, active touch/pen contacts, and the
 last 120 input events in this page session. It records event type, relative time,
 contact ID/type, a generic control category, acceptance, and rejection/cancellation
-reason. It never includes key values, coordinates, or calculation contents and is
+reason. Movement/release events also include `maxDistance`, the rounded maximum
+distance from the initial contact in CSS pixels. It never includes key values,
+absolute coordinates, or calculation contents and is
 neither persisted nor transmitted. Reloading clears it. After a missed input,
 open Information and Settings, show diagnostics, and copy the JSON before reloading.
 `logic-rejected` means the calculator rejected the action; `duplicate-click` means
@@ -85,11 +87,13 @@ click without a matching recently completed contact. `dragged`, `outside`, and
 `canceled` distinguish discarded gestures.
 
 Touch and pen actions commit on release, including overlapping contacts in release
-order. Movement up to 12 CSS pixels is tolerated, with an 8-pixel release margin
-around the original key. A larger excursion cancels the gesture even if the finger
+order. Movement within the original key is tolerated, including an 8-pixel margin
+around its bounds. Leaving that area cancels the gesture even if the finger
 returns. Browser gesture cancellation, lost capture, mode changes, backgrounding,
 and window focus loss discard unfinished contacts. Mouse and keyboard activation
 remain available through click events; touch-generated clicks are deduplicated.
+Recently completed contact IDs suppress follow-up clicks even when iOS labels
+them as mouse input and retargets them to another calculator key.
 
 The normal release process does not depend on a personal iPhone or other
 physical device. A real-device check can add evidence for an operating-system

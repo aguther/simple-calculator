@@ -23,6 +23,43 @@ test.describe("pointer input", () => {
     await page.getByRole("button",{name:"Rechner",exact:true}).click();
   });
 
+  test("suppresses the diagnosed equals click retargeted to an operator", async ({page}) => {
+    await digit(page,"7").click();
+    const equals=page.locator('[data-action="eq"]');
+    const box=await equals.boundingBox();
+    const event={pointerType:"touch",pointerId:8311,isPrimary:true,clientX:box.x+box.width/2,clientY:box.y+box.height/2};
+    await equals.dispatchEvent("pointerdown",event);
+    await equals.dispatchEvent("pointerup",event);
+    await page.locator('[data-op="+"]').evaluate(button => button.dispatchEvent(new PointerEvent("click",{bubbles:true,pointerType:"mouse",pointerId:8311,isPrimary:true,detail:1})));
+    await expect(page.locator("#pending")).toBeEmpty();
+    await digit(page,"2").click();
+    await expect(page.locator("#current")).toHaveText("2");
+    const input=await report(page);
+    expect(input.events).toContainEqual(expect.objectContaining({type:"click",control:"operator",pointerId:8311,accepted:false,reason:"duplicate-click"}));
+  });
+
+  test("suppresses a canceled contact click retargeted to another key", async ({page}) => {
+    await pointer(page,"7","pointerdown",8312);
+    await pointer(page,"7","pointercancel",8312);
+    await digit(page,"8").evaluate(button => button.dispatchEvent(new PointerEvent("click",{bubbles:true,pointerType:"mouse",pointerId:8312,detail:1})));
+    await expect(page.locator("#current")).toHaveText("0");
+    await digit(page,"8").click();
+    await expect(page.locator("#current")).toHaveText("8");
+  });
+
+  test("accepts movement beyond twelve pixels inside the original key and reports distance", async ({page}) => {
+    await pointer(page,"7","pointerdown");
+    await pointer(page,"7","pointermove",1,25,0);
+    await pointer(page,"7","pointerup",1,20,0);
+    await expect(page.locator("#current")).toHaveText("7");
+    const input=await report(page);
+    expect(input.events).toContainEqual(expect.objectContaining({type:"pointerup",control:"digit",accepted:true,maxDistance:25}));
+    for(const event of input.events) {
+      expect(event).not.toHaveProperty("clientX");
+      expect(event).not.toHaveProperty("clientY");
+    }
+  });
+
   test("handles browser-generated overlapping touches with slight movement", async ({page,context,browserName}) => {
     test.skip(browserName!=="chromium", "Native multitouch injection requires Chromium CDP; pointer sequences run in all engines.");
     const session=await context.newCDPSession(page);
@@ -69,7 +106,8 @@ test.describe("pointer input", () => {
     await pointer(page,"7","pointercancel");
     await digit(page,"7").dispatchEvent("click",{pointerType:"touch",pointerId:1,detail:1});
     await pointer(page,"8","pointerdown",2);
-    await pointer(page,"8","pointermove",2,30,0);
+    const box=await digit(page,"8").boundingBox();
+    await pointer(page,"8","pointermove",2,box.width,0);
     await pointer(page,"8","pointerup",2);
     await expect(page.locator("#current")).toHaveText("0");
     await pointer(page,"9","pointerdown",3);
@@ -152,7 +190,7 @@ test.describe("pointer input", () => {
       expect.objectContaining({type:"pointercancel",reason:"canceled"})
     ]));
     for(const event of input.events) {
-      expect(Object.keys(event).every(key => ["type","time","pointerId","pointerType","primary","control","accepted","reason"].includes(key))).toBe(true);
+      expect(Object.keys(event).every(key => ["type","time","pointerId","pointerType","primary","control","accepted","reason","maxDistance"].includes(key))).toBe(true);
     }
   });
 

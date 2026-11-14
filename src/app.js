@@ -181,7 +181,7 @@
   var contacts=new Map();
   var recentContacts=[];
 
-  function recordInput(type,event,control,accepted,reason){
+  function recordInput(type,event,control,accepted,reason,maxDistance){
     inputCounts[type]=(inputCounts[type] || 0)+1;
     if(accepted===false && reason==="logic-rejected") inputCounts.rejected=(inputCounts.rejected || 0)+1;
     if(reason==="duplicate-click" || reason==="missing-contact") inputCounts.suppressed=(inputCounts.suppressed || 0)+1;
@@ -193,6 +193,7 @@
     }
     if(accepted!==undefined) item.accepted=accepted;
     if(reason) item.reason=reason;
+    if(maxDistance!==undefined) item.maxDistance=Math.round(maxDistance);
     inputEvents.push(item);
     if(inputEvents.length>120) inputEvents.shift();
   }
@@ -220,16 +221,19 @@
   function contactMoved(contact,event){
     var dx=event.clientX-contact.x;
     var dy=event.clientY-contact.y;
-    if(dx*dx+dy*dy>144) contact.dragged=true;
+    contact.maxDistance=Math.max(contact.maxDistance,Math.sqrt(dx*dx+dy*dy));
+    var rect=contact.bounds;
+    if(event.clientX<rect.left-8 || event.clientX>rect.right+8 || event.clientY<rect.top-8 || event.clientY>rect.bottom+8) contact.dragged=true;
   }
 
   function finishContact(event){
+    if(event.pointerType!=="touch" && event.pointerType!=="pen") return;
     var contact=contacts.get(event.pointerId);
     if(!contact) return;
     contacts.delete(event.pointerId);
     rememberContact(contact,event.pointerId);
     releaseContactVisual(contact.button);
-    contactMoved(contact,event);
+    if(event.type==="pointerup") contactMoved(contact,event);
     var reason=null;
     if(event.type==="pointercancel") reason="canceled";
     else if(contact.dragged) reason="dragged";
@@ -244,14 +248,15 @@
       if(accepted) feedback();
       else reason="logic-rejected";
     }
-    recordInput(event.type,event,contact.control,accepted,reason);
+    recordInput(event.type,event,contact.control,accepted,reason,contact.maxDistance);
   }
 
   document.addEventListener("pointermove",function(event){
+    if(event.pointerType!=="touch" && event.pointerType!=="pen") return;
     var contact=contacts.get(event.pointerId);
     if(!contact) return;
     contactMoved(contact,event);
-    recordInput("pointermove",event,contact.control);
+    recordInput("pointermove",event,contact.control,undefined,null,contact.maxDistance);
   },true);
   document.addEventListener("pointerup",finishContact,true);
   document.addEventListener("pointercancel",finishContact,true);
@@ -270,7 +275,7 @@
         lastMouseDown=performance.now();
         return;
       }
-      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,dragged:false});
+      contacts.set(event.pointerId,{button:button,control:control,activate:activate,x:event.clientX,y:event.clientY,bounds:button.getBoundingClientRect(),maxDistance:0,dragged:false});
       recordInput("pointerdown",event,control);
       try{ button.setPointerCapture(event.pointerId); }catch(error){}
     });
@@ -288,9 +293,14 @@
       var legacy=!direct && event.detail>0 && recentContacts.some(function(contact){
         return contact.button===button && contact.time>lastMouseDown && performance.now()-contact.time<800;
       });
-      if(direct || legacy){
+      // iOS can retarget a completed contact's mouse-labelled click to another key.
+      // A real mouse pointerdown and keyboard activation must still work.
+      var matched=event.detail>0 && event.pointerId>=0 && recentContacts.some(function(contact){
+        return contact.id===event.pointerId && contact.time>lastMouseDown && performance.now()-contact.time<1500;
+      });
+      if(direct || legacy || matched){
         event.preventDefault();
-        var known=legacy || recentContacts.some(function(contact){ return contact.id===event.pointerId && performance.now()-contact.time<1500; });
+        var known=legacy || matched || recentContacts.some(function(contact){ return contact.id===event.pointerId && performance.now()-contact.time<1500; });
         recordInput("click",event,control,false,known ? "duplicate-click" : "missing-contact");
         return;
       }
