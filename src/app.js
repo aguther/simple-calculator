@@ -232,12 +232,12 @@
       var other=peer.getBoundingClientRect();
       if(other.width<=0 || other.height<=0) return;
       if(other.bottom>rect.top && other.top<rect.bottom){
-        if(other.right<=rect.left) left=Math.min(left,rect.left-(other.left+other.right)/2);
-        if(other.left>=rect.right) right=Math.min(right,(other.left+other.right)/2-rect.right);
+        if(other.right<=rect.left) left=Math.min(left,rect.left-other.left);
+        if(other.left>=rect.right) right=Math.min(right,other.right-rect.right);
       }
       if(other.right>rect.left && other.left<rect.right){
-        if(other.bottom<=rect.top) top=Math.min(top,rect.top-(other.top+other.bottom)/2);
-        if(other.top>=rect.bottom) bottom=Math.min(bottom,(other.top+other.bottom)/2-rect.bottom);
+        if(other.bottom<=rect.top) top=Math.min(top,rect.top-other.top);
+        if(other.top>=rect.bottom) bottom=Math.min(bottom,other.bottom-rect.bottom);
       }
     });
     // Mirror the opposite neighbor's margin at outer edges; isolated controls

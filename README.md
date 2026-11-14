@@ -88,9 +88,10 @@ beyond the key margin; `canceled` indicates an aborted gesture.
 
 Touch and pen actions commit on release, including overlapping contacts in release
 order. The original key remains the target while held. Its release area extends
-to the centers of the nearest neighboring buttons in the same control group,
-including the corresponding diagonal corners. The actual button sizes and gaps are used,
-including for the wide zero key. Outer edges mirror the opposite margin;
+to the outer edges of the nearest neighboring buttons in the same control group,
+including the corresponding diagonal corners. Swiping across the original key
+and its immediate neighbors does not change which key is activated. The actual
+button sizes and gaps are used, including for the wide zero key. Outer edges mirror the opposite margin;
 isolated controls extend by half their own width/height. Leaving the key while
 holding a finger down does not cancel the contact: returning before release activates the original key once.
 Releasing beyond the margin discards the contact. Calculator controls disable

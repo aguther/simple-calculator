@@ -79,7 +79,7 @@ test.describe("pointer input", () => {
   });
 
   for(const viewport of [{width:390,height:844},{width:844,height:390},{width:820,height:1180},{width:1180,height:820}]) {
-    test(`accepts release up to neighboring key centers at ${viewport.width}x${viewport.height}`, async ({page}) => {
+    test(`accepts swipes up to neighboring key outer edges at ${viewport.width}x${viewport.height}`, async ({page}) => {
       await page.setViewportSize(viewport);
       await expect.poll(() => page.locator("#app").evaluate(element => Math.round(element.getBoundingClientRect().height))).toBe(viewport.height);
       const button=digit(page,"5");
@@ -90,9 +90,10 @@ test.describe("pointer input", () => {
       const expected=["5","55","555","5 555"];
       for(const [neighbor,dx,dy] of [["4",-1,0],["6",1,0],["8",0,-1],["2",0,1]]) {
         const adjacent=await clientBox(digit(page,neighbor));
-        const edge={clientX:adjacent.x+adjacent.width/2,clientY:adjacent.y+adjacent.height/2};
+        const edge={clientX:adjacent.x+(dx<0 ? 0 : dx>0 ? adjacent.width : adjacent.width/2),clientY:adjacent.y+(dy<0 ? 0 : dy>0 ? adjacent.height : adjacent.height/2)};
         const contact={...start,pointerId:pointerId++};
         await button.dispatchEvent("pointerdown",contact);
+        await button.dispatchEvent("pointermove",{...contact,...edge});
         await button.dispatchEvent("pointerup",{...contact,...edge});
         await digit(page,neighbor).evaluate((element,id) => element.dispatchEvent(new PointerEvent("click",{bubbles:true,pointerType:"mouse",pointerId:id,detail:1})),contact.pointerId);
         await expect(page.locator("#current")).toHaveText(expected[accepted++]);
@@ -104,7 +105,10 @@ test.describe("pointer input", () => {
       await expect(page.locator("#current")).toHaveText("5 555");
       const diagonal=await clientBox(digit(page,"9"));
       await button.dispatchEvent("pointerdown",{...start,pointerId:200});
-      await button.dispatchEvent("pointerup",{...start,pointerId:200,clientX:diagonal.x+diagonal.width/2,clientY:diagonal.y+diagonal.height/2});
+      await button.dispatchEvent("pointerup",{...start,pointerId:200,clientX:diagonal.x+diagonal.width,clientY:diagonal.y});
+      await expect(page.locator("#current")).toHaveText("55 555");
+      await button.dispatchEvent("pointerdown",{...start,pointerId:201});
+      await button.dispatchEvent("pointerup",{...start,pointerId:201,clientX:diagonal.x+diagonal.width+1,clientY:diagonal.y});
       await expect(page.locator("#current")).toHaveText("55 555");
     });
   }
@@ -114,7 +118,7 @@ test.describe("pointer input", () => {
     const button=digit(page,"0");
     const box=await clientBox(button);
     const adjacent=await clientBox(page.locator('[data-action="sep"]'));
-    const boundary=adjacent.x+adjacent.width/2;
+    const boundary=adjacent.x+adjacent.width;
     const start={pointerType:"touch",clientX:box.x+box.width/2,clientY:box.y+box.height/2};
     for(const [id,x] of [[301,boundary],[302,boundary+1],[303,box.x-(boundary-(box.x+box.width))],[304,box.x-(boundary-(box.x+box.width))-1]]) {
       await button.dispatchEvent("pointerdown",{...start,pointerId:id});
@@ -233,7 +237,7 @@ test.describe("pointer input", () => {
     await button.dispatchEvent("pointerup",{...start,clientX:box.x-3});
     await expect(page.locator("#current")).toHaveText("7");
     await button.dispatchEvent("pointerdown",{...start,pointerId:2});
-    await button.dispatchEvent("pointerup",{...start,pointerId:2,clientX:box.x-box.width});
+    await button.dispatchEvent("pointerup",{...start,pointerId:2,clientX:box.x-box.width*2});
     await expect(page.locator("#current")).toHaveText("7");
   });
 
