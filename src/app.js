@@ -224,6 +224,31 @@
     contact.maxDistance=Math.max(contact.maxDistance,Math.sqrt(dx*dx+dy*dy));
   }
 
+  function releaseBounds(button){
+    var rect=button.getBoundingClientRect();
+    var left=Infinity,right=Infinity,top=Infinity,bottom=Infinity;
+    Array.prototype.forEach.call(button.parentElement.children,function(peer){
+      if(peer===button || peer.tagName!=="BUTTON") return;
+      var other=peer.getBoundingClientRect();
+      if(other.width<=0 || other.height<=0) return;
+      if(other.bottom>rect.top && other.top<rect.bottom){
+        if(other.right<=rect.left) left=Math.min(left,rect.left-(other.left+other.right)/2);
+        if(other.left>=rect.right) right=Math.min(right,(other.left+other.right)/2-rect.right);
+      }
+      if(other.right>rect.left && other.left<rect.right){
+        if(other.bottom<=rect.top) top=Math.min(top,rect.top-(other.top+other.bottom)/2);
+        if(other.top>=rect.bottom) bottom=Math.min(bottom,(other.top+other.bottom)/2-rect.bottom);
+      }
+    });
+    // Mirror the opposite neighbor's margin at outer edges; isolated controls
+    // use half their own size. Include disabled keys as physical neighbors.
+    if(!Number.isFinite(left)) left=Number.isFinite(right) ? right : rect.width/2;
+    if(!Number.isFinite(right)) right=left;
+    if(!Number.isFinite(top)) top=Number.isFinite(bottom) ? bottom : rect.height/2;
+    if(!Number.isFinite(bottom)) bottom=top;
+    return {left:rect.left-left,right:rect.right+right,top:rect.top-top,bottom:rect.bottom+bottom};
+  }
+
   function finishContact(event){
     if(event.pointerType!=="touch" && event.pointerType!=="pen") return;
     var contact=contacts.get(event.pointerId);
@@ -236,8 +261,8 @@
     if(event.type==="pointercancel") reason="canceled";
     else if(!contact.button.isConnected || contact.button.disabled || el.aboutDialog.open) reason="unavailable";
     else{
-      var rect=contact.button.getBoundingClientRect();
-      if(event.clientX<rect.left-16 || event.clientX>rect.right+16 || event.clientY<rect.top-16 || event.clientY>rect.bottom+16) reason="outside";
+      var rect=releaseBounds(contact.button);
+      if(event.clientX<rect.left || event.clientX>rect.right || event.clientY<rect.top || event.clientY>rect.bottom) reason="outside";
     }
     var accepted=false;
     if(!reason){

@@ -9,6 +9,12 @@ async function pointer(page, n, type, id=1, dx=0, dy=0, extra={}) {
     button:0, buttons:type==="pointerup" ? 0 : 1, ...extra
   });
 }
+async function clientBox(locator) {
+  return locator.evaluate(element => {
+    const rect=element.getBoundingClientRect();
+    return {x:rect.left,y:rect.top,width:rect.right-rect.left,height:rect.bottom-rect.top};
+  });
+}
 async function report(page) {
   await page.getByRole("button",{name:"Informationen und Einstellungen"}).click();
   await page.getByRole("button",{name:"Diagnose anzeigen"}).click();
@@ -63,39 +69,58 @@ test.describe("pointer input", () => {
   test("accepts return to the original key after leaving it", async ({page}) => {
     const box=await digit(page,"7").boundingBox();
     await pointer(page,"7","pointerdown",71);
-    await pointer(page,"7","pointermove",71,box.width,0);
+    await pointer(page,"7","pointermove",71,box.width*2,0);
     await pointer(page,"7","pointermove",71,0,0);
     await pointer(page,"7","pointerup",71);
     await digit(page,"8").evaluate(button => button.dispatchEvent(new PointerEvent("click",{bubbles:true,pointerType:"mouse",pointerId:71,detail:1})));
     await expect(page.locator("#current")).toHaveText("7");
     const input=await report(page);
-    expect(input.events).toContainEqual(expect.objectContaining({type:"pointerup",pointerId:71,accepted:true,maxDistance:Math.round(box.width)}));
+    expect(input.events).toContainEqual(expect.objectContaining({type:"pointerup",pointerId:71,accepted:true,maxDistance:Math.round(box.width*2)}));
   });
 
-  test("accepts release within the larger margin on every edge but rejects release beyond it", async ({page}) => {
-    const button=digit(page,"7");
-    const box=await button.boundingBox();
-    const x=box.x+box.width/2;
-    const y=box.y+box.height/2;
-    const edges=[
-      {clientX:box.x-16,clientY:y,outside:{clientX:box.x-17,clientY:y}},
-      {clientX:box.x+box.width+16,clientY:y,outside:{clientX:box.x+box.width+17,clientY:y}},
-      {clientX:x,clientY:box.y-16,outside:{clientX:x,clientY:box.y-17}},
-      {clientX:x,clientY:box.y+box.height+16,outside:{clientX:x,clientY:box.y+box.height+17}}
-    ];
-    let pointerId=100;
-    for(const edge of edges) {
-      const start={pointerType:"touch",pointerId:pointerId++,clientX:x,clientY:y};
-      await button.dispatchEvent("pointerdown",start);
-      await button.dispatchEvent("pointerup",{...start,clientX:edge.clientX,clientY:edge.clientY});
-      const outside={...start,pointerId:pointerId++};
-      await button.dispatchEvent("pointerdown",outside);
-      await button.dispatchEvent("pointerup",{...outside,...edge.outside});
+  for(const viewport of [{width:390,height:844},{width:844,height:390},{width:820,height:1180},{width:1180,height:820}]) {
+    test(`accepts release up to neighboring key centers at ${viewport.width}x${viewport.height}`, async ({page}) => {
+      await page.setViewportSize(viewport);
+      await expect.poll(() => page.locator("#app").evaluate(element => Math.round(element.getBoundingClientRect().height))).toBe(viewport.height);
+      const button=digit(page,"5");
+      const box=await clientBox(button);
+      const start={pointerType:"touch",clientX:box.x+box.width/2,clientY:box.y+box.height/2};
+      let pointerId=100;
+      let accepted=0;
+      const expected=["5","55","555","5 555"];
+      for(const [neighbor,dx,dy] of [["4",-1,0],["6",1,0],["8",0,-1],["2",0,1]]) {
+        const adjacent=await clientBox(digit(page,neighbor));
+        const edge={clientX:adjacent.x+adjacent.width/2,clientY:adjacent.y+adjacent.height/2};
+        const contact={...start,pointerId:pointerId++};
+        await button.dispatchEvent("pointerdown",contact);
+        await button.dispatchEvent("pointerup",{...contact,...edge});
+        await digit(page,neighbor).evaluate((element,id) => element.dispatchEvent(new PointerEvent("click",{bubbles:true,pointerType:"mouse",pointerId:id,detail:1})),contact.pointerId);
+        await expect(page.locator("#current")).toHaveText(expected[accepted++]);
+        const outside={...start,pointerId:pointerId++};
+        await button.dispatchEvent("pointerdown",outside);
+        await button.dispatchEvent("pointerup",{...outside,clientX:edge.clientX+dx,clientY:edge.clientY+dy});
+        await expect(page.locator("#current")).toHaveText(expected[accepted-1]);
+      }
+      await expect(page.locator("#current")).toHaveText("5 555");
+      const diagonal=await clientBox(digit(page,"9"));
+      await button.dispatchEvent("pointerdown",{...start,pointerId:200});
+      await button.dispatchEvent("pointerup",{...start,pointerId:200,clientX:diagonal.x+diagonal.width/2,clientY:diagonal.y+diagonal.height/2});
+      await expect(page.locator("#current")).toHaveText("55 555");
+    });
+  }
+
+  test("uses the actual neighboring width for the wide zero key and mirrors outer edges", async ({page}) => {
+    await digit(page,"7").click();
+    const button=digit(page,"0");
+    const box=await clientBox(button);
+    const adjacent=await clientBox(page.locator('[data-action="sep"]'));
+    const boundary=adjacent.x+adjacent.width/2;
+    const start={pointerType:"touch",clientX:box.x+box.width/2,clientY:box.y+box.height/2};
+    for(const [id,x] of [[301,boundary],[302,boundary+1],[303,box.x-(boundary-(box.x+box.width))],[304,box.x-(boundary-(box.x+box.width))-1]]) {
+      await button.dispatchEvent("pointerdown",{...start,pointerId:id});
+      await button.dispatchEvent("pointerup",{...start,pointerId:id,clientX:x});
     }
-    await expect(page.locator("#current")).toHaveText("7 777");
-    const input=await report(page);
-    expect(input.events.filter(event => event.type==="pointerup" && event.accepted)).toHaveLength(4);
-    expect(input.events.filter(event => event.type==="pointerup" && event.reason==="outside")).toHaveLength(4);
+    await expect(page.locator("#current")).toHaveText("700");
   });
 
   test("handles native overlapping touches and returns while retaining history scrolling", async ({page,context,browserName}) => {
@@ -116,7 +141,7 @@ test.describe("pointer input", () => {
     const key=await digit(page,"7").boundingBox();
     const returning={id:3,x:key.x+key.width/2,y:key.y+key.height/2};
     await session.send("Input.dispatchTouchEvent",{type:"touchStart",touchPoints:[returning]});
-    await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{...returning,x:returning.x+key.width}]});
+    await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[{...returning,x:returning.x+key.width*2}]});
     await session.send("Input.dispatchTouchEvent",{type:"touchMove",touchPoints:[returning]});
     await session.send("Input.dispatchTouchEvent",{type:"touchEnd",touchPoints:[]});
     const nativeReport=await report(page);
@@ -171,8 +196,8 @@ test.describe("pointer input", () => {
     await digit(page,"7").dispatchEvent("click",{pointerType:"touch",pointerId:1,detail:1});
     await pointer(page,"8","pointerdown",2);
     const box=await digit(page,"8").boundingBox();
-    await pointer(page,"8","pointermove",2,box.width,0);
-    await pointer(page,"8","pointerup",2,box.width,0);
+    await pointer(page,"8","pointermove",2,box.width*2,0);
+    await pointer(page,"8","pointerup",2,box.width*2,0);
     await expect(page.locator("#current")).toHaveText("0");
     await pointer(page,"9","pointerdown",3);
     await pointer(page,"9","pointerup",3);
@@ -208,7 +233,7 @@ test.describe("pointer input", () => {
     await button.dispatchEvent("pointerup",{...start,clientX:box.x-3});
     await expect(page.locator("#current")).toHaveText("7");
     await button.dispatchEvent("pointerdown",{...start,pointerId:2});
-    await button.dispatchEvent("pointerup",{...start,pointerId:2,clientX:box.x-17});
+    await button.dispatchEvent("pointerup",{...start,pointerId:2,clientX:box.x-box.width});
     await expect(page.locator("#current")).toHaveText("7");
   });
 

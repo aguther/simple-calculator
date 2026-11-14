@@ -87,9 +87,12 @@ click without a matching recently completed contact. `outside` means release
 beyond the key margin; `canceled` indicates an aborted gesture.
 
 Touch and pen actions commit on release, including overlapping contacts in release
-order. The release position is checked against the original key with a 16-pixel margin
-around its current bounds. Leaving the key while holding a finger down does not
-cancel the contact: returning before release activates the original key once.
+order. The original key remains the target while held. Its release area extends
+to the centers of the nearest neighboring buttons in the same control group,
+including the corresponding diagonal corners. The actual button sizes and gaps are used,
+including for the wide zero key. Outer edges mirror the opposite margin;
+isolated controls extend by half their own width/height. Leaving the key while
+holding a finger down does not cancel the contact: returning before release activates the original key once.
 Releasing beyond the margin discards the contact. Calculator controls disable
 browser panning and zoom gestures so return and multi-touch input remain
 available. The calculation tape retains vertical scrolling; touch zoom is
